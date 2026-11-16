@@ -108,6 +108,7 @@
   .side-section { border-top: 1px solid var(--border); padding: 10px 16px; }
   .side-section summary { cursor: pointer; color: var(--muted); font-size: 12px; }
   .side-section .inner { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .side-section[open] > .inner { max-height: 40vh; overflow-y: auto; }
 
   /* chat */
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -203,6 +204,8 @@
     .call-controls button { padding: 10px 16px; }
   }
 
+  .check { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+  .check input { width: 16px; height: 16px; margin: 0; }
   .call-test { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
   .call-test select, .call-test meter { width: 100%; }
   .call-test meter { height: 16px; }
@@ -311,6 +314,14 @@
         <input type="text" id="stun" placeholder="stun:stun.l.google.com:19302">
         <label class="hint" for="myip">Your IP address (optional). Browsers hide your local IP behind a random “….local” name. If connecting on the same network fails, enter your LAN IP here (e.g. 192.168.1.23) and create a new code.</label>
         <input type="text" id="myip" placeholder="e.g. 192.168.1.23">
+        <label class="check"><input type="checkbox" id="meet"> Use public meeting points</label>
+        <p class="hint" id="meetInfo"></p>
+        <div id="meetBox" class="inner" hidden>
+          <label class="hint" for="relays">Meeting points (Nostr relays, one per line)</label>
+          <textarea id="relays" rows="4" spellcheck="false"></textarea>
+          <p class="hint" id="meetStatus"></p>
+          <div class="row"><button type="button" id="btnCancelInvites" hidden>Cancel open invite links</button></div>
+        </div>
       </div>
     </details>
   </aside>
@@ -344,7 +355,8 @@
     <h2 id="connectTitle">Connect to someone</h2>
     <form method="dialog"><button aria-label="Close">✕</button></form>
   </div>
-  <p class="hint">One person creates an invite and sends the code to the other (any messenger, email, …). The other person accepts it and sends a reply code back. The chat itself never goes through a server.</p>
+  <p class="hint" id="connectHint"></p>
+  <p class="hint" id="meetOffer" hidden>Swapping two codes is tedious? <button type="button" class="link" id="btnMeetOffer">Use a single link instead</button></p>
   <div class="row">
     <button type="button" class="primary" id="btnInvite">Create invite</button>
     <button type="button" id="btnJoin">Join with invite</button>
@@ -447,7 +459,7 @@
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
@@ -567,6 +579,8 @@ ipEl.addEventListener("change", () => store.set("p2pchat.myip", ipEl.value.trim(
 // contacts: { [userId]: { name, pub, lastSeen, verified } }
 // convs:    { [convId]: { id, type: "dm"|"group", peer?, name?, members?, msgs: [], unread, updated } }
 // outbox:   [{ to: userId, pkt, conv, ts }]  signed packets waiting for that person's ack
+// invites:  [{ id, secret, created, expires }]  open invite links (meeting points)
+// A contact's `rv` is a secret shared with them, used to find each other at meeting points.
 const STATE_KEY = "p2pchat.v2.state";
 const MAX_MSGS = 1000;                          // per chat
 const OUTBOX_TTL = 30 * 24 * 3600 * 1000;       // undelivered packets are dropped after 30 days
@@ -574,9 +588,9 @@ const OUTBOX_TTL = 30 * 24 * 3600 * 1000;       // undelivered packets are dropp
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STATE_KEY));
-    if (s && s.convs && s.contacts && Array.isArray(s.outbox)) return s;
+    if (s && s.convs && s.contacts && Array.isArray(s.outbox)) { if (!Array.isArray(s.invites)) s.invites = []; return s; }
   } catch {}
-  return { contacts: {}, convs: {}, outbox: [] };
+  return { contacts: {}, convs: {}, outbox: [], invites: [] };
 }
 const S = loadState();
 let active = true;        // false once another tab took over (or while restoring a backup)
@@ -614,6 +628,7 @@ function deactivate() {
   writeState();
   active = false;
   for (const p of [...peers.values()]) removePeer(p);
+  relaysUpdate();
   for (const d of document.querySelectorAll("dialog[open]")) d.close();
   $("inactive").hidden = false;
 }
@@ -898,6 +913,8 @@ function removePeer(peer) {
   try { peer.pc.close(); } catch {}
   if (pendingPeer === peer) pendingPeer = null;
   if (call && call.peer === peer) callLost();
+  if (joining && joining.peer === peer) joinFailed();
+  if (peer.cid && active && !isOnline(peer.cid)) setTimeout(() => announce([peer.cid]), 3000); // e.g. network change: find each other again
   render();
 }
 
@@ -927,6 +944,391 @@ async function joinWithInvite(code) {
   await peer.pc.setLocalDescription(await peer.pc.createAnswer());
   await gatherComplete(peer.pc);
   return { peer, code: await encodeCode({ type: "answer", sdp: withMyIp(peer.pc.localDescription.sdp) }) };
+}
+
+// ---------- BIP-340 Schnorr signatures on secp256k1 (for Nostr events) ----------
+// WebCrypto has no secp256k1, so this is a small implementation. It's only used to
+// sign throwaway Nostr events with a random per-session key; it's not constant-time.
+const SECP_P = 2n ** 256n - 0x1000003D1n;
+const SECP_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
+const SECP_G = [0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n,
+                0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n, 1n];
+const fmod = (a, m = SECP_P) => { const r = a % m; return r < 0n ? r + m : r; };
+function finv(a, m = SECP_P) { // extended Euclid
+  let [r0, r1, s0, s1] = [fmod(a, m), m, 1n, 0n];
+  while (r1) { const q = r0 / r1; [r0, r1] = [r1, r0 - q * r1]; [s0, s1] = [s1, s0 - q * s1]; }
+  return fmod(s0, m);
+}
+// Jacobian coordinates (X, Y, Z); Z = 0 is the point at infinity.
+function jDouble([X, Y, Z]) {
+  if (!Z || !Y) return [0n, 1n, 0n];
+  const A = fmod(X * X), B = fmod(Y * Y), C = fmod(B * B);
+  const D = fmod(2n * (fmod((X + B) ** 2n) - A - C)), E = 3n * A, F = fmod(E * E);
+  const X3 = fmod(F - 2n * D);
+  return [X3, fmod(E * (D - X3) - 8n * C), fmod(2n * Y * Z)];
+}
+function jAdd(p, q) {
+  if (!p[2]) return q;
+  if (!q[2]) return p;
+  const [X1, Y1, Z1] = p, [X2, Y2, Z2] = q;
+  const Z1Z1 = fmod(Z1 * Z1), Z2Z2 = fmod(Z2 * Z2);
+  const U1 = fmod(X1 * Z2Z2), U2 = fmod(X2 * Z1Z1);
+  const S1 = fmod(Y1 * Z2 * Z2Z2), S2 = fmod(Y2 * Z1 * Z1Z1);
+  if (U1 === U2) return S1 === S2 ? jDouble(p) : [0n, 1n, 0n];
+  const H = fmod(U2 - U1), R = fmod(S2 - S1), H2 = fmod(H * H), H3 = fmod(H * H2), U1H2 = fmod(U1 * H2);
+  const X3 = fmod(R * R - H3 - 2n * U1H2);
+  return [X3, fmod(R * (U1H2 - X3) - S1 * H3), fmod(H * Z1 * Z2)];
+}
+function mulG(k) {
+  let r = [0n, 1n, 0n], q = SECP_G;
+  for (; k > 0n; k >>= 1n) { if (k & 1n) r = jAdd(r, q); q = jDouble(q); }
+  const zi = finv(r[2]), zi2 = fmod(zi * zi);
+  return [fmod(r[0] * zi2), fmod(r[1] * zi2 * zi)];
+}
+const big = (b) => BigInt("0x" + (hexOf(b) || "0"));
+const be32 = (n) => Uint8Array.from(n.toString(16).padStart(64, "0").match(/../g), (h) => parseInt(h, 16));
+const hexOf = (b) => [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+const cat = (...a) => { const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let i = 0; for (const x of a) { o.set(x, i); i += x.length; } return o; };
+const sha256 = async (b) => new Uint8Array(await crypto.subtle.digest("SHA-256", b));
+async function taggedHash(tag, ...parts) {
+  const t = await sha256(new TextEncoder().encode(tag));
+  return sha256(cat(t, t, ...parts));
+}
+// A random private key and its x-only public key.
+function schnorrKey() {
+  for (;;) {
+    const d = big(crypto.getRandomValues(new Uint8Array(32)));
+    if (d > 0n && d < SECP_N) return { d, pub: be32(mulG(d)[0]) };
+  }
+}
+async function schnorrSign(msg, key) {
+  const P = mulG(key.d);
+  const d = P[1] % 2n ? SECP_N - key.d : key.d;
+  const aux = await taggedHash("BIP0340/aux", crypto.getRandomValues(new Uint8Array(32)));
+  const t = be32(d).map((x, i) => x ^ aux[i]);
+  const k0 = big(await taggedHash("BIP0340/nonce", t, be32(P[0]), msg)) % SECP_N;
+  if (!k0) throw new Error("bad nonce");
+  const R = mulG(k0);
+  const k = R[1] % 2n ? SECP_N - k0 : k0;
+  const e = big(await taggedHash("BIP0340/challenge", be32(R[0]), be32(P[0]), msg)) % SECP_N;
+  return cat(be32(R[0]), be32((k + e * d) % SECP_N));
+}
+
+// ---------- meeting points: public Nostr relays (optional, off by default) ----------
+// WebRTC needs an offer and an answer to travel between two browsers. With meeting
+// points on, they travel through public Nostr relays instead of being copied by hand:
+// - Invite links: the link holds a random secret. Both apps derive a topic and an
+//   encryption key from it, meet under that topic, and swap offer and answer.
+// - Contacts: every pair shares a secret (`rv`), so they find each other again after
+//   a reload or a network change.
+// Relays only see random topics (changing daily) and encrypted content, signed with a
+// throwaway key per page load. They do see IP addresses and timing. Chats never pass
+// through them, and the hello still proves who's on the other end.
+const MEET_KIND = 25050; // "ephemeral" event kind: relays pass these on without storing them
+const DEFAULT_RELAYS = ["wss://nos.lol", "wss://relay.primal.net", "wss://nostr.mom", "wss://relay.nostr.net"];
+const INVITE_TTL = 7 * 24 * 3600 * 1000;
+const MEET_EXPLAIN = "P2P Chat then uses public Nostr relays as a meeting point to find the other person's app. The relays see your IP address and when you're online, and could tell which IP addresses meet. They can't see names or messages: the connection details are encrypted, and chats still go directly between you.";
+const meetEl = $("meet"), relaysEl = $("relays");
+meetEl.checked = store.get("p2pchat.meet", "") === "1";
+relaysEl.value = store.get("p2pchat.relays", DEFAULT_RELAYS.join("\n"));
+const meetOn = () => meetEl.checked;
+const relayList = () => relaysEl.value.split(/\s+/).filter((u) => /^wss:\/\/[^\s/]+/.test(u)).slice(0, 8);
+const mySess = uid();          // this page's address at the meeting point
+let nostrKey = null;           // throwaway Nostr key, created on first use
+const relayConns = new Map();  // url -> { ws, retry, timer, subs, closed }
+const seenEvents = new Set();
+let topicMap = new Map();      // topic -> channel { type: "invite"|"join"|"pair", secret, key, inv?, cid? }
+let meetQueue = Promise.resolve();
+
+const meetKeys = new Map();
+async function channel(type, secretB64, extra = {}) {
+  if (!meetKeys.has(secretB64)) {
+    const raw = await sha256(cat(utf8("p2pchat-meet-key\n"), unb64u(secretB64)));
+    meetKeys.set(secretB64, await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]));
+  }
+  return { type, secretB64, key: meetKeys.get(secretB64), ...extra };
+}
+const dayNo = () => Math.floor(Date.now() / 86400000);
+const topicFor = async (ch, day) => hexOf(await sha256(cat(utf8(`p2pchat-meet-topic\n${day}\n`), unb64u(ch.secretB64))));
+
+async function seal(ch, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, ch.key, utf8(JSON.stringify(obj)));
+  return b64u(cat(iv, new Uint8Array(ct)));
+}
+async function unseal(ch, text) {
+  try {
+    const b = unb64u(text);
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b.slice(0, 12) }, ch.key, b.slice(12));
+    return JSON.parse(new TextDecoder().decode(pt));
+  } catch { return null; } // not for us, or tampered with
+}
+
+// Relay connections: open while meeting points are on, reconnecting with backoff.
+function relaysUpdate() {
+  const want = new Set(meetOn() && me && active ? relayList() : []);
+  for (const [url, r] of relayConns) {
+    if (want.has(url)) continue;
+    r.closed = true; clearTimeout(r.timer);
+    try { r.ws && r.ws.close(); } catch {}
+    relayConns.delete(url);
+  }
+  for (const url of want) if (!relayConns.has(url)) openRelay(url, { retry: 0, subs: 0 });
+  renderMeet();
+}
+function openRelay(url, r) {
+  relayConns.set(url, r);
+  try { r.ws = new WebSocket(url); } catch { return; }
+  r.subs = 0;
+  r.ws.onopen = () => { r.retry = 0; sendSubs(r); renderMeet(); announceSoon(); };
+  r.ws.onmessage = (m) => onRelayMessage(m.data);
+  r.ws.onclose = () => {
+    if (r.closed) return;
+    r.timer = setTimeout(() => { if (!r.closed) openRelay(url, r); }, Math.min(60000, 2000 * 2 ** r.retry++));
+    renderMeet();
+  };
+}
+const openRelays = () => [...relayConns.values()].filter((r) => r.ws && r.ws.readyState === WebSocket.OPEN);
+
+let resubTimer = null;
+function resubscribe() {
+  if (resubTimer) return;
+  resubTimer = setTimeout(async () => {
+    resubTimer = null;
+    const chans = [];
+    if (meetOn() && me && active) {
+      const now = Date.now();
+      const before = S.invites.length;
+      S.invites = S.invites.filter((i) => i.expires > now);
+      if (S.invites.length !== before) save();
+      for (const inv of S.invites) chans.push(await channel("invite", inv.secret, { inv: inv.id }));
+      if (joining) chans.push(joining.ch);
+      for (const [cid, ct] of Object.entries(S.contacts)) if (ct.rv) chans.push(await channel("pair", ct.rv, { cid }));
+    }
+    const map = new Map(), d = dayNo();
+    for (const ch of chans) for (const day of [d - 1, d, d + 1]) map.set(await topicFor(ch, day), ch);
+    topicMap = map;
+    for (const r of openRelays()) sendSubs(r);
+    renderMeet();
+  }, 30);
+}
+function sendSubs(r) {
+  const topics = [...topicMap.keys()];
+  const n = Math.ceil(topics.length / 60); // relays limit filter sizes
+  const since = Math.floor(Date.now() / 1000) - 60;
+  for (let i = 0; i < n; i++) r.ws.send(JSON.stringify(["REQ", "p2p" + i, { kinds: [MEET_KIND], "#t": topics.slice(i * 60, i * 60 + 60), since }]));
+  for (let i = n; i < r.subs; i++) r.ws.send(JSON.stringify(["CLOSE", "p2p" + i]));
+  r.subs = n;
+}
+
+async function meetSend(ch, obj) {
+  const relays = openRelays();
+  if (!relays.length) return;
+  if (!nostrKey) nostrKey = schnorrKey();
+  const ev = { pubkey: hexOf(nostrKey.pub), created_at: Math.floor(Date.now() / 1000), kind: MEET_KIND,
+    tags: [["t", await topicFor(ch, dayNo())]], content: await seal(ch, { ...obj, from: mySess, ts: Date.now() }) };
+  const id = await sha256(utf8(JSON.stringify([0, ev.pubkey, ev.created_at, ev.kind, ev.tags, ev.content])));
+  ev.id = hexOf(id);
+  ev.sig = hexOf(await schnorrSign(id, nostrKey));
+  seenEvents.add(ev.id);
+  const msg = JSON.stringify(["EVENT", ev]);
+  for (const r of relays) try { r.ws.send(msg); } catch {}
+}
+
+// Nostr signatures aren't checked here: relays check them, and our content is
+// encrypted and authenticated with a key that only the two people know.
+function onRelayMessage(data) {
+  let m; try { m = JSON.parse(data); } catch { return; }
+  if (!Array.isArray(m) || m[0] !== "EVENT" || !m[2] || typeof m[2] !== "object") return;
+  const ev = m[2];
+  if (typeof ev.id !== "string" || seenEvents.has(ev.id)) return; // the same event arrives from several relays
+  if (seenEvents.size > 5000) seenEvents.clear();
+  seenEvents.add(ev.id);
+  const tag = Array.isArray(ev.tags) && ev.tags.find((t) => Array.isArray(t) && t[0] === "t");
+  const ch = tag && topicMap.get(tag[1]);
+  if (!ch || typeof ev.content !== "string" || ev.content.length > 30000) return;
+  meetQueue = meetQueue.then(async () => {
+    const msg = await unseal(ch, ev.content);
+    if (!msg || typeof msg.from !== "string" || msg.from === mySess) return;
+    if (Math.abs(Date.now() - Number(msg.ts)) > 10 * 60000) return; // stale or replayed
+    if (msg.to !== undefined && msg.to !== mySess) return;
+    if (msg.code !== undefined && (typeof msg.code !== "string" || msg.code.length > 20000)) return;
+    if (ch.type === "invite") await onInviteMsg(ch, msg);
+    else if (ch.type === "join") await onJoinMsg(ch, msg);
+    else if (ch.type === "pair") await onPairMsg(ch, msg);
+  }).catch((e) => console.error(e));
+}
+
+// A connection attempt that doesn't succeed in time is dropped.
+const dropIfNotConnected = (peer, ms) => setTimeout(() => { if (peers.has(peer.key) && !peer.cid) removePeer(peer); }, ms);
+
+// --- invite links, inviting side
+const inviteAnswers = new Map(); // offer id -> { peer, code }
+function inviteLinkBase() {
+  return location.protocol === "https:" || location.protocol === "http:" ? location.origin + location.pathname : "https://martin-thoma.com/chat-app/";
+}
+function createInviteLink() {
+  const secret = b64u(crypto.getRandomValues(new Uint8Array(16)));
+  const inv = { id: uid(), secret, created: Date.now(), expires: Date.now() + INVITE_TTL };
+  S.invites = [...S.invites, inv].slice(-20);
+  save(); resubscribe();
+  return { inv, link: `${inviteLinkBase()}#join=${secret}` };
+}
+async function onInviteMsg(ch, msg) {
+  if (msg.type !== "offer" || typeof msg.oid !== "string" || !S.invites.some((i) => i.id === ch.inv)) return;
+  let a = inviteAnswers.get(msg.oid);
+  if (!a || !peers.has(a.peer.key)) {
+    const { peer, code } = await joinWithInvite(msg.code);
+    peer.invite = ch.inv;
+    a = { peer, code };
+    inviteAnswers.set(msg.oid, a);
+    dropIfNotConnected(peer, 60000);
+  }
+  await meetSend(ch, { type: "answer", to: msg.from, oid: msg.oid, code: a.code });
+}
+function inviteUsed(invId, c) {
+  if (!S.invites.some((i) => i.id === invId)) return;
+  S.invites = S.invites.filter((i) => i.id !== invId); // each link works once
+  sysNote(c, "Connected through your invite link.");
+  save(); resubscribe();
+  const watching = connectDlg.open && flow.dataset.invite === invId;
+  if (watching) connectDlg.close();
+  if (watching || !current) openConv(c.id);
+  $("announcer").textContent = `${convName(c)} opened your invite link. You're connected.`;
+}
+
+// --- invite links, joining side: keep offering until the inviter's app answers
+let joining = null; // { secretB64, ch, peer, code, oid, built, answered, timer, status }
+async function startJoin(secretB64, status) {
+  stopJoin();
+  const j = joining = { secretB64, ch: await channel("join", secretB64), status, answered: false };
+  resubscribe();
+  const tick = async () => {
+    if (joining !== j || j.answered) return;
+    // Rebuild the offer now and then: NAT mappings found through STUN expire.
+    if (!j.peer || Date.now() - j.built > 60000) {
+      const old = j.peer;
+      const { peer, code } = await createInvite();
+      if (joining !== j) return removePeer(peer);
+      Object.assign(j, { peer, code, oid: uid(), built: Date.now() });
+      pendingPeer = peer;
+      if (old) removePeer(old);
+    }
+    await meetSend(j.ch, { type: "offer", oid: j.oid, code: j.code });
+  };
+  j.tick = tick;
+  j.timer = setInterval(tick, 6000);
+  await tick();
+}
+function stopJoin() {
+  if (!joining) return;
+  clearInterval(joining.timer);
+  joining = null;
+  resubscribe();
+}
+async function onJoinMsg(ch, msg) {
+  const j = joining;
+  if (!j || ch.secretB64 !== j.secretB64 || msg.type !== "answer" || msg.oid !== j.oid || j.answered) return;
+  j.answered = true;
+  clearInterval(j.timer);
+  if (j.status) j.status.textContent = "Found your friend's app. Connecting…";
+  try { await acceptAnswer(j.peer, msg.code); } catch (e) { if (joining === j) joinFailed(); }
+}
+function joinFailed() {
+  const j = joining;
+  stopJoin();
+  if (!connectDlg.open) return;
+  flow.replaceChildren(el("div", { className: "step" },
+    el("b", { textContent: "Couldn't connect" }),
+    el("p", { className: "hint", textContent: "Your friend's app answered, but a direct connection wasn't possible. This happens on some mobile and office networks. Try again, or try from another network." }),
+    el("div", { className: "row" }, el("button", { type: "button", className: "primary", textContent: "Try again", onclick: () => joinViaLink(j.secretB64) }))));
+}
+async function joinViaLink(secretB64) {
+  if (!meetOn()) {
+    const v = await ask("Connect through a meeting point?", MEET_EXPLAIN + " You can turn this off under Network settings.",
+      [["on", "Turn on and connect", "primary"], ["cancel", "Cancel"]]);
+    if (v !== "on") return;
+    setMeet(true);
+  }
+  if (!connectDlg.open) openConnect();
+  resetPending();
+  const status = el("p", { className: "hint", role: "status", textContent: "Looking for your friend's app…" });
+  flow.append(el("div", { className: "step" },
+    el("b", { textContent: "Connecting through a meeting point" }), status,
+    el("p", { className: "hint", textContent: "This works while P2P Chat is open on your friend's side too. Keep this window open: it keeps trying." })));
+  await startJoin(secretB64, status);
+}
+const linkSecret = (text) => ((String(text).match(/#join=([A-Za-z0-9_-]{16,64})\s*$/) || [])[1]);
+
+// --- contacts: find each other again (the side with the smaller ID makes the offer)
+const pairTries = new Map(); // cid -> { peer, oid, offer?, at }
+const hereReplied = new Map();
+function onRendezvousSecret(peer, p) {
+  if (me.id < peer.cid || typeof p.rv !== "string" || !/^[A-Za-z0-9_-]{32,64}$/.test(p.rv)) return;
+  if (S.contacts[peer.cid].rv === p.rv) return;
+  S.contacts[peer.cid].rv = p.rv;
+  save(); resubscribe();
+}
+async function onPairMsg(ch, msg) {
+  const cid = ch.cid;
+  if (isOnline(cid) || !S.contacts[cid]) return;
+  const t = pairTries.get(cid);
+  const trying = t && peers.has(t.peer.key) && Date.now() - t.at < 45000;
+  if (msg.type === "here") {
+    if (me.id < cid) {
+      if (trying) return;
+      const { peer, code } = await createInvite();
+      if (isOnline(cid)) return removePeer(peer);
+      peer.expect = cid;
+      const oid = uid();
+      pairTries.set(cid, { peer, oid, at: Date.now() });
+      dropIfNotConnected(peer, 45000);
+      await meetSend(ch, { type: "offer", to: msg.from, oid, code });
+    } else if (Date.now() - (hereReplied.get(cid) || 0) > 10000) {
+      hereReplied.set(cid, Date.now());
+      await meetSend(ch, { type: "here" });
+    }
+  } else if (msg.type === "offer" && me.id > cid && typeof msg.oid === "string") {
+    if (trying && t.offer === msg.oid) return;
+    if (t && peers.has(t.peer.key)) removePeer(t.peer); // a newer offer replaces an older attempt
+    const { peer, code } = await joinWithInvite(msg.code);
+    peer.expect = cid;
+    pairTries.set(cid, { peer, offer: msg.oid, at: Date.now() });
+    dropIfNotConnected(peer, 45000);
+    await meetSend(ch, { type: "answer", to: msg.from, oid: msg.oid, code });
+  } else if (msg.type === "answer" && me.id < cid && t && t.oid === msg.oid && !t.peer.pc.remoteDescription) {
+    await acceptAnswer(t.peer, msg.code);
+  }
+}
+// Tell contacts (and a pending invite) that we're here.
+let announceTimer = null, lastAnnounce = 0;
+function announceSoon() { clearTimeout(announceTimer); announceTimer = setTimeout(() => announce(), 1500); }
+async function announce(only) {
+  if (!meetOn() || !me || !active) return;
+  if (!only) lastAnnounce = Date.now();
+  if (joining && !joining.answered) joining.tick();
+  for (const [cid, ct] of Object.entries(S.contacts)) {
+    if (!ct.rv || isOnline(cid) || (only && !only.includes(cid))) continue;
+    await meetSend(await channel("pair", ct.rv, { cid }), { type: "here" });
+  }
+}
+
+function setMeet(on) {
+  meetEl.checked = on;
+  store.set("p2pchat.meet", on ? "1" : "");
+  if (!on) stopJoin();
+  relaysUpdate(); resubscribe();
+}
+function renderMeet() {
+  $("meetInfo").textContent = meetOn()
+    ? "Invites are a single link, and contacts who use meeting points too reconnect by themselves after a reload or a network change. " + MEET_EXPLAIN
+    : "Turn this on to invite people with a single link, and to reconnect to contacts automatically. Off by default, because it uses public servers to find each other.";
+  $("meetBox").hidden = !meetOn();
+  if (!meetOn()) return;
+  const open = openRelays().length, invites = S.invites.filter((i) => i.expires > Date.now()).length;
+  $("meetStatus").textContent = `Connected to ${open} of ${relayConns.size} meeting points.` +
+    (invites ? ` ${invites} open invite link${invites > 1 ? "s" : ""}.` : "");
+  $("btnCancelInvites").hidden = !invites;
 }
 
 // ---------- delivery ----------
@@ -993,6 +1395,7 @@ async function onData(peer, raw) {
   // Calls: live signaling, never stored. The channel itself is authenticated by the hello.
   if (p.t === "call") return onCall(peer, p);
   if (p.t === "rtc") return onRtc(peer, p);
+  if (p.t === "rv") return onRendezvousSecret(peer, p);
   if (typeof p.pid !== "string") return;
   sendPeer(peer, { t: "ack", pid: p.pid }); // ack duplicates too: the earlier ack may have been lost
   if (seen.has(p.pid)) return;
@@ -1015,6 +1418,7 @@ async function onHello(peer, p) {
   if (!ok) return fail("Couldn't verify who's on the other end, so the connection was closed.");
   if (id === me.id) return fail("That's your own code. Send it to someone else.");
   if (peer.cid && peer.cid !== id) return removePeer(peer); // a connection can't switch identities
+  if (peer.expect && peer.expect !== id) return removePeer(peer); // automatic reconnection reached someone else
 
   const name = clip(p.name, 32).trim() || "Anonymous";
   const known = S.contacts[id];
@@ -1030,6 +1434,12 @@ async function onHello(peer, p) {
   if (known && known.name !== name) sysNote(c, `${known.name} is now called ${name}.`);
   save();
   if (pendingPeer === peer) { pendingPeer = null; $("connectDlg").close(); openConv(c.id); }
+  if (peer.invite) inviteUsed(peer.invite, c);
+  if (me.id < id) { // the side with the smaller ID hands out the shared meeting secret
+    if (!S.contacts[id].rv) { S.contacts[id].rv = b64u(crypto.getRandomValues(new Uint8Array(32))); save(); }
+    sendPeer(peer, { t: "rv", rv: S.contacts[id].rv });
+    resubscribe();
+  }
   flushOutbox(id);
   render();
 }
@@ -1679,35 +2089,70 @@ let pendingPeer = null;
 
 function openConnect() {
   flow.replaceChildren();
-  connectDlg.showModal();
+  delete flow.dataset.invite;
+  $("connectHint").textContent = meetOn()
+    ? "Create an invite link and send it to your friend (any messenger, email, …). When they open it, you're connected automatically while P2P Chat is open on both sides. The chat itself never goes through a server."
+    : "One person creates an invite and sends the code to the other (any messenger, email, …). The other person accepts it and sends a reply code back. The chat itself never goes through a server.";
+  $("btnInvite").textContent = meetOn() ? "Create invite link" : "Create invite";
+  $("meetOffer").hidden = meetOn();
+  if (!connectDlg.open) connectDlg.showModal();
 }
 connectDlg.addEventListener("close", () => {
+  stopJoin();
   if (pendingPeer && pendingPeer.status !== "ok") removePeer(pendingPeer);
   pendingPeer = null;
   flow.replaceChildren();
 });
 
-function codeBox(code) {
-  const ta = el("textarea", { readOnly: true, rows: 5, value: code });
+function codeBox(code, label = "Copy code", rows = 5) {
+  const ta = el("textarea", { readOnly: true, rows, value: code });
   ta.addEventListener("focus", () => ta.select());
-  const copy = el("button", { type: "button", textContent: "Copy code" });
+  const copy = el("button", { type: "button", textContent: label });
   copy.onclick = async () => {
     try { await navigator.clipboard.writeText(code); }
     catch { ta.select(); document.execCommand("copy"); }
     copy.textContent = "Copied ✓";
-    setTimeout(() => (copy.textContent = "Copy code"), 1500);
+    setTimeout(() => (copy.textContent = label), 1500);
   };
-  return [ta, el("div", { className: "row" }, copy)];
+  const share = navigator.share && label === "Copy link"
+    ? el("button", { type: "button", textContent: "Share…", onclick: () => navigator.share({ title: "P2P Chat invite", url: code }).catch(() => {}) })
+    : null;
+  return [ta, el("div", { className: "row" }, copy, share)];
 }
 const errorText = (e) => el("div", { className: "error", textContent: e.message || String(e) });
 
 function resetPending() {
+  stopJoin();
+  delete flow.dataset.invite;
   if (pendingPeer && pendingPeer.status !== "ok") removePeer(pendingPeer);
   pendingPeer = null;
   flow.replaceChildren();
 }
 
-$("btnInvite").onclick = async () => {
+$("btnInvite").onclick = () => (meetOn() ? inviteLinkFlow() : inviteCodeFlow());
+$("btnMeetOffer").onclick = async () => {
+  const v = await ask("Connect with a single link?", MEET_EXPLAIN + " You can turn this off under Network settings.",
+    [["on", "Turn on meeting points", "primary"], ["cancel", "Cancel"]]);
+  if (v === "on") { setMeet(true); openConnect(); }
+};
+
+function inviteLinkFlow() {
+  resetPending();
+  const { inv, link } = createInviteLink();
+  flow.dataset.invite = inv.id;
+  const cancel = el("button", { type: "button", className: "link", textContent: "Cancel this invite", onclick: () => {
+    S.invites = S.invites.filter((i) => i.id !== inv.id); save(); resubscribe(); renderMeet(); resetPending();
+  } });
+  flow.append(
+    el("div", { className: "step" }, el("b", { textContent: "1. Send this link to your friend" }), ...codeBox(link, "Copy link", 2)),
+    el("div", { className: "step" }, el("b", { textContent: "2. Wait for them to open it" }),
+      el("p", { className: "hint", textContent: "You're connected automatically while P2P Chat is open on both sides. You can close this window: the link works once and stays valid for 7 days." }),
+      el("div", { className: "row" }, cancel)),
+    el("p", { className: "hint" }, el("button", { type: "button", className: "link", textContent: "Swap codes by hand instead", onclick: inviteCodeFlow })));
+  renderMeet();
+}
+
+async function inviteCodeFlow() {
   resetPending();
   flow.append(el("div", { className: "step" }, el("b", { textContent: "Preparing invite…" })));
   try {
@@ -1734,15 +2179,17 @@ $("btnInvite").onclick = async () => {
 
 $("btnJoin").onclick = () => {
   resetPending();
-  const offer = el("textarea", { rows: 4, placeholder: "Paste the invite code here" });
+  const offer = el("textarea", { rows: 4, placeholder: meetOn() ? "Paste the invite link or code here" : "Paste the invite code here" });
   const err = el("div");
   const go = el("button", { type: "button", className: "primary", textContent: "Accept invite" });
   const step = el("div", { className: "step" },
-    el("b", { textContent: "1. Paste the invite code you received" }), offer,
+    el("b", { textContent: meetOn() ? "1. Paste the invite link or code you received" : "1. Paste the invite code you received" }), offer,
     el("div", { className: "hint", textContent: "Next, you'll get a reply code to send back to your friend." }),
     err, el("div", { className: "row" }, go));
   go.onclick = async () => {
     err.replaceChildren();
+    const secret = linkSecret(offer.value);
+    if (secret) return joinViaLink(secret);
     try {
       go.disabled = true;
       const { peer, code } = await joinWithInvite(offer.value);
@@ -1877,7 +2324,9 @@ function renderChat() {
   if (c.type === "dm") {
     const on = isOnline(c.peer);
     const ct = S.contacts[c.peer] || {};
-    $("chatSub").textContent = (on ? "Connected" : "Not connected. Your messages are sent when you reconnect.") + (ct.verified ? " · Verified ✓" : "");
+    $("chatSub").textContent = (on ? "Connected"
+      : meetOn() && ct.rv ? `Not connected. You reconnect automatically when ${convName(c)} is online; your messages are sent then.`
+      : "Not connected. Your messages are sent when you reconnect.") + (ct.verified ? " · Verified ✓" : "");
     if (!on) actions.push(el("button", { type: "button", textContent: "Reconnect", onclick: openConnect }));
     if (on && !call) actions.push(
       el("button", { type: "button", textContent: "Call", onclick: () => startCall(c.peer, false) }),
@@ -1974,6 +2423,11 @@ $("callCam").onclick = toggleCamera;
 $("callMin").onclick = minimizeCall;
 $("btnCallReturn").onclick = showCall;
 $("btnCallSetup").onclick = openCallSetup;
+meetEl.addEventListener("change", () => setMeet(meetEl.checked));
+relaysEl.addEventListener("change", () => { store.set("p2pchat.relays", relaysEl.value.trim()); relaysUpdate(); });
+$("btnCancelInvites").onclick = () => { S.invites = []; save(); resubscribe(); renderMeet(); };
+window.addEventListener("online", () => announceSoon());
+window.addEventListener("hashchange", () => { const s = me && takeJoinLink(); if (s) joinViaLink(s); });
 // Escape doesn't end a call: it goes back to the chat (or does nothing while ringing).
 callDlg.addEventListener("cancel", (e) => { e.preventDefault(); minimizeCall(); });
 
@@ -2019,10 +2473,23 @@ async function checkForUpdate() {
 $("btnUpdate").onclick = applyUpdate;
 
 // ---------- start ----------
+// An invite link opened in the browser: #join=<secret>. The fragment never reaches a web server.
+function takeJoinLink() {
+  const m = location.hash.match(/^#join=([A-Za-z0-9_-]{16,64})$/);
+  if (!m) return null;
+  history.replaceState(null, "", location.pathname + location.search);
+  return m[1];
+}
+let pendingJoin = null;
+
 function startApp() {
   renderAccount();
   renderCallAccess();
   render();
+  relaysUpdate(); resubscribe();
+  setInterval(() => { resubscribe(); announce(); }, 5 * 60 * 1000); // topics change daily; say hello again now and then
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - lastAnnounce > 60000) announce(); });
+  if (pendingJoin) { const s = pendingJoin; pendingJoin = null; joinViaLink(s); }
   let restored = false;
   try { restored = sessionStorage.getItem("p2pchat.restored") === "1"; sessionStorage.removeItem("p2pchat.restored"); } catch {}
   if (restored) $("announcer").textContent = "Your account was restored.";
@@ -2033,6 +2500,8 @@ async function start() {
   document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
   checkForUpdate();
   if (!window.isSecureContext || !window.crypto || !crypto.subtle) { $("insecure").hidden = false; return; }
+  pendingJoin = takeJoinLink();
+  renderMeet();
   const rec = loadIdentityRecord();
   if (!rec) { $("onboarding").hidden = false; obShow("start"); return; }
   try { me = await openIdentity(rec); }

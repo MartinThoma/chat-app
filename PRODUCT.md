@@ -57,6 +57,17 @@ Browsers can't open a connection to a bare IP address. Two people instead swap a
 
 Each code works only once. Mistakes give clear errors, for example "That's an invite code, not a reply code".
 
+### Meeting points (optional)
+
+With **Use public meeting points** turned on (Network settings, or **Use a single link instead** in the Connect dialog), the codes travel through public Nostr relays instead of by hand:
+
+- **Invite links.** **Connect → Create invite link** gives a link like `https://martin-thoma.com/chat-app/#join=…`. Send it to your friend; when they open it (or paste it into **Join with invite**), the two apps find each other and connect, as long as P2P Chat is open on both sides. A link works once and stays valid for 7 days, also after a reload. **Cancel this invite** and **Cancel open invite links** withdraw it.
+- **Automatic reconnection.** Contacts who both use meeting points find each other again after a reload, a closed tab or a network change, usually within a few seconds. The chat header says "You reconnect automatically when Bob is online".
+- **Consent.** It's off by default. Turning it on, and opening an invite link while it's off, first explains what the relays can see and asks.
+- **What the relays see:** your IP address, when you're online, and a random topic that changes daily, so they could tell which IP addresses meet. They don't see names, account IDs or messages: offer and answer are encrypted with a key only the two people know, events are signed with a throwaway key per page load, and chats still go directly between you. The hello still proves who's on the other end.
+- **Relays:** `nos.lol`, `relay.primal.net`, `nostr.mom` and `relay.nostr.net` by default, editable in Network settings (any Nostr relay that passes on ephemeral events works, including your own). The settings show how many are connected.
+- A meeting point only replaces the code exchange. Connecting across the internet still needs STUN, as before.
+
 ### Contacts
 
 - Everyone you've connected to becomes a **contact**, recognized by their account ID. Reconnecting later with new codes continues the same chat.
@@ -126,12 +137,15 @@ Only one tab can be connected and saving at a time. Opening the app in a second 
 
 - **STUN server**, `stun:stun.l.google.com:19302` by default. It only tells your browser its public IP so people can connect across the internet. No messages pass through it. Leave it empty for local-network or fully offline use.
 - **Your IP address**: browsers hide local IPs behind random `….local` names, which some networks can't resolve. If connecting on the same network fails, entering your LAN IP puts it into your codes instead.
+- **Use public meeting points**, with the list of relays (see Meeting points). Off by default.
 - `make run` starts a local HTTPS server with a self-signed certificate and prints your LAN IP. Browsers warn about the certificate once.
 
 ## Limits and non-goals
 
 - **No relay server (TURN).** If both people are behind strict NATs, as on some mobile or office networks, a direct connection may not be possible.
-- **Connections don't survive** a reload, closing the tab, or a change of IP address (Wi-Fi ↔ mobile data, VPN on or off). Reconnecting means swapping new codes. Chats and unsent messages are kept.
+- **Connections don't survive** a reload, closing the tab, or a change of IP address (Wi-Fi ↔ mobile data, VPN on or off). Without meeting points, reconnecting means swapping new codes. With meeting points on both sides, the apps reconnect by themselves. Chats and unsent messages are kept either way.
+- **Meeting points need both apps open at the same time.** Relays pass messages on without storing them, so an invite link only connects while the inviter's app is open too.
+- **Automatic reconnection needs one connection made with 1.5 or later**, because that's when the two apps agree on their shared meeting secret.
 - **Offline people can't be reached.** A message reaches someone only while both of you are online and connected, directly or through a group member.
 - **No sync between devices.** Each browser is its own identity with its own history.
 - **Group delivery is best effort.** Members who are offline get missed group messages only when they next connect directly to the sender. Messages passed on by other members are not stored for later.
@@ -160,9 +174,21 @@ All packets are JSON sent over a single WebRTC data channel per connection. The 
 | `leave` | `pid`, `group`, `from`, `sig` | A member left |
 | `call` | `a`, `call`, `video?`, `mic?`, `cam?` | Call control, never stored or acknowledged. `a` is `ring` (with `video`), `accept`, `decline`, `busy`, `end`, or `state` (with `mic` and `cam`, sent when they change). `call` is a random call ID. |
 | `rtc` | `desc` or `cand` | Adds or removes microphone and camera on the existing connection: an SDP offer or answer, or an ICE candidate. Collisions are resolved by "perfect negotiation": the side with the smaller account ID gives way. |
+| `rv` | `rv` | The meeting secret for this pair of contacts (32 random bytes, base64url). Sent by the side with the smaller account ID after every hello. |
 | `ack` | `pid` | Confirms receipt. The sender removes the packet from its outbox. Not signed, because it only travels over the connection the identity was proven on. |
 
 - **Signatures:** ECDSA P-256 with SHA-256, over `p2pchat-packet\n` followed by the packet without `sig`, serialized as JSON with sorted keys and no `undefined` fields. Keys and signatures are base64url.
-- **Unsigned packets:** `ack`, `call` and `rtc` aren't signed. They're only accepted on a connection whose `hello` was verified, so they can only come from that person.
+- **Unsigned packets:** `ack`, `call`, `rtc` and `rv` aren't signed. They're only accepted on a connection whose `hello` was verified, so they can only come from that person.
 - **Passing on:** group packets (`group` set) are passed on to connected members, and duplicates are dropped by `pid`. Personal packets are accepted only directly from their author.
 - **Security number:** the SHA-256 hash of `p2pchat-safety\n<id1>\n<id2>`, with the IDs sorted. The first 24 bytes are read as six 32-bit numbers, each taken modulo 100000.
+
+### Meeting points
+
+Nostr events of kind `25050` (ephemeral: relays pass them on without storing them), tagged `["t", topic]`, signed with BIP-340 Schnorr by a random key per page load.
+
+- **Secret:** 16 random bytes for an invite link (in the URL fragment, which browsers never send to a web server), or the pair's `rv`.
+- **Topic:** hex SHA-256 of `p2pchat-meet-topic\n<day>\n<secret>`, where `<day>` is days since 1970 (UTC). Apps listen on yesterday's, today's and tomorrow's topic and publish on today's.
+- **Content:** base64url of a 12-byte IV followed by AES-256-GCM ciphertext, with the key SHA-256 of `p2pchat-meet-key\n<secret>`. The plaintext is JSON: `{type, from, ts, to?, oid?, code?}`. `from` is a random ID for the page; `code` is a normal connection code.
+- **Invite link:** the joiner sends `offer` every 6 seconds (with a new offer every 60 seconds); the inviter replies `answer` with the same `oid`. The link is used up when the hello succeeds.
+- **Contacts:** both sides send `here` when they come online, when the network comes back, when a connection drops and every 5 minutes. The side with the smaller account ID answers a `here` with an `offer`; the other side answers `here` with `here`, and an `offer` with an `answer`. The hello must come from the expected contact.
+- Messages older than 10 minutes, not addressed to this page, or that fail to decrypt are ignored.

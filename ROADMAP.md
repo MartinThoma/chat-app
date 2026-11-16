@@ -15,9 +15,11 @@ WebRTC needs an offer and an answer to travel between two browsers before they c
 **Fits the principles:** no server is added.
 **Limit:** it needs at least one existing connection. It doesn't help with the very first contact, or when nobody mutual is online.
 
-## B. Optional public meeting points
+## B. Optional public meeting points (done in 1.5)
 
 **Goal:** one code (or link) is enough. Bob opens Alice's link and the connection forms by itself.
+
+Shipped in 1.5 with Nostr relays: invite links and automatic reconnection between contacts. See "Meeting points" in [PRODUCT.md](PRODUCT.md).
 
 - Use existing public infrastructure as a meeting point, for example Nostr relays or BitTorrent WebSocket trackers. The Trystero library uses this approach.
 - Both browsers look for each other at the meeting point under a random topic derived from the invite. They exchange offer and answer there, encrypted with a key from the invite, then connect directly. Messages never pass through the meeting point.

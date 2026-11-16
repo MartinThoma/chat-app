@@ -132,7 +132,9 @@ Disabled buttons are shown at 50% opacity.
 
 **Dialogs.** Native `<dialog>` elements, at most 460px wide, 14px radius, dimmed backdrop. Used for connecting, creating a group, adding people, and every confirmation. The title is 16px bold, followed by a muted explanation, with actions right-aligned. Escape and Cancel always close a dialog without side effects.
 
-**Connection steps.** Numbered cards ("1. Send this invite code to your friend") with a monospace code box and a **Copy code** button that briefly changes to "Copied ✓".
+**Connection steps.** Numbered cards ("1. Send this invite code to your friend") with a monospace code box and a **Copy code** button that briefly changes to "Copied ✓". Invite links use a two-line box with **Copy link** and, where the browser can share, **Share…**. Step 2 says what happens next and offers **Cancel this invite** as a text link. "Swap codes by hand instead" sits below as a small text link.
+
+**Meeting points setting.** A checkbox with a bold 12px label in Network settings, followed by a muted explanation that changes with the state: what it's for while off; what the relays can see while on. Turning it on (also from the Connect dialog's "Use a single link instead", or by opening an invite link) always goes through a confirmation that spells out what the relays see. The relay list and status only appear while it's on. Open sidebar sections scroll inside at most 40% of the window height, so the chat list stays visible.
 
 **Update banner.** A full-width accent strip under the top bar: "Version x is available…" with **Reload now**.
 

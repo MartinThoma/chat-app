@@ -15,6 +15,7 @@ Use it at **https://martin-thoma.com/chat-app/**, or run it yourself:
 - Everything you send is signed, so nobody can pretend to be you or change your messages. A security number lets two people verify each other.
 - Back up your account to a file and restore it on another device.
 - Voice and video calls in personal chats, over the same direct connection.
+- Optional meeting points: invite with a single link, and reconnect automatically after a reload. Uses public Nostr relays only to find each other; off by default.
 - Personal chats and group chats. Group members don't all need to be connected to each other: members pass messages on.
 - Messages written while someone isn't connected are sent when they reconnect, with a "Not delivered yet" marker until then.
 - Delete a message for yourself, or your own message for everyone. Delete a chat, or leave a group.
@@ -30,9 +31,11 @@ See [PRODUCT.md](PRODUCT.md) for the full feature description and its limits, [D
 2. **Bob** clicks **Connect → Join with invite**, pastes the code, clicks **Accept invite** and sends back the reply code he gets.
 3. **Alice** pastes the reply code and clicks **Connect**. Their personal chat opens.
 
+With **meeting points** turned on, Alice clicks **Create invite link** instead and sends the link. When Bob opens it, the apps connect by themselves through a public Nostr relay. The relays see IP addresses and timing, never names or messages.
+
 Browsers can't connect to a bare IP address, so the codes carry each side's IP addresses, ports and encryption fingerprint. If connecting on the same network fails, open **Network settings** and enter your LAN IP (`make run` shows it).
 
-Connections end on a reload, when the tab is closed, or when an IP address changes. Reconnect by swapping new codes. Your chats are kept.
+Connections end on a reload, when the tab is closed, or when an IP address changes. Reconnect by swapping new codes, or let meeting points do it automatically. Your chats are kept.
 
 ## Releasing a new version
 
