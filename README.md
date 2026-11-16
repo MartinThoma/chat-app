@@ -20,6 +20,7 @@ Use it at **https://martin-thoma.com/chat-app/**, or run it yourself:
 - Messages written while someone isn't connected are sent when they reconnect, with a "Not delivered yet" marker until then.
 - Times and status on every message: ✓ delivered, ✓✓ read. Long-press a message to select it, then copy, delete or see when it was sent, delivered and read.
 - Delete a message for yourself, or your own message for everyone. Delete a chat, or leave a group.
+- Notifications for messages and calls while the app is open in the background.
 - Name, contacts and history survive closing the browser.
 - Light and dark mode, works on phones.
 - Updates itself when a new version is published.

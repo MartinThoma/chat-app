@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>P2P Chat</title>
+<link rel="icon" href="data:,">
 <style>
   :root {
     --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #596173;
@@ -317,6 +318,14 @@
         <div class="row"><button type="button" id="btnCallSetup">Set up calls</button></div>
       </div>
     </details>
+    <details class="side-section" id="notifySettings">
+      <summary>Notifications</summary>
+      <div class="inner">
+        <label class="check"><input type="checkbox" id="notify"> Show notifications</label>
+        <label class="check"><input type="checkbox" id="notifyText"> Include message text</label>
+        <p class="hint" id="notifyInfo"></p>
+      </div>
+    </details>
     <details class="side-section" id="settings">
       <summary>Network settings</summary>
       <div class="inner">
@@ -478,7 +487,7 @@
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
@@ -797,11 +806,19 @@ const obViews = {
       try {
         const cam = await requestCallAccess();
         const done = el("button", { type: "button", className: "primary", textContent: "Start chatting", onclick: finishOnboarding });
+        const notifyBtn = notifPermission() === "unsupported" ? null : el("button", { type: "button", textContent: "Also turn on notifications" });
+        const notifyMsg = el("p", { className: "hint", role: "status" });
+        if (notifyBtn) notifyBtn.onclick = async () => {
+          await setNotify(true);
+          notifyBtn.remove();
+          notifyMsg.textContent = notifyEl.checked ? "Notifications are on." : $("notifyInfo").textContent;
+        };
         obCard.replaceChildren(
           el("h2", { className: "ob-ok", textContent: "Calls are ready" }),
-          el("p", { textContent: cam ? "Your microphone and camera are allowed. They're only switched on during a call."
-            : "Your microphone is allowed. No camera was found, so your calls will be voice only." }),
-          el("div", { className: "actions" }, done));
+          el("p", { textContent: (cam ? "Your microphone and camera are allowed. They're only switched on during a call."
+            : "Your microphone is allowed. No camera was found, so your calls will be voice only.") +
+            (notifyBtn ? " You can also get notifications for messages and calls while P2P Chat is open in the background." : "") }),
+          notifyMsg, el("div", { className: "actions" }, done, notifyBtn));
         done.focus();
       } catch (e) { err.textContent = mediaError(e); go.disabled = false; go.textContent = "Try again"; }
     };
@@ -840,7 +857,7 @@ function ensureDm(cid) {
 function addToConv(c, m) {
   c.msgs.push(m);
   c.updated = Date.now();
-  if (!m.sys && m.from !== me.id && (c.id !== current || document.hidden)) c.unread = (c.unread || 0) + 1;
+  if (!m.sys && m.from !== me.id && (c.id !== current || !chatOnScreen())) c.unread = (c.unread || 0) + 1;
   save();
 }
 const sysNote = (c, text) => addToConv(c, { id: uid(), sys: true, text, ts: Date.now() });
@@ -1479,6 +1496,7 @@ function receivedMsg(c, p, from) {
   addToConv(c, { id, from, text: p.text.slice(0, 10000), ts: Number(p.ts) || Date.now(), rcvd: Date.now() });
   const where = c.type === "group" ? ` in ${c.name}` : "";
   $("announcer").textContent = `${contactName(from)}${where}: ${p.text.slice(0, 300)}`;
+  notifyMessage(c, from, p.text);
 }
 // They read our messages: `at` is their clock, but never later than now.
 function receivedRead(c, p, from) {
@@ -1619,12 +1637,13 @@ async function deleteMessages(c, list) {
 
 // Read receipts: when a chat is on screen, its new messages count as read, and
 // their authors get a signed "read" packet (delivered like messages).
-const chatOnScreen = () => !document.hidden && !callDlg.open &&
+const chatOnScreen = () => !document.hidden && document.hasFocus() && !callDlg.open &&
   (matchMedia("(min-width: 761px)").matches || document.body.classList.contains("show-chat"));
 async function markRead(c) {
   if (!c || !chatOnScreen()) return;
   const now = Date.now(), byAuthor = new Map();
-  let changed = false;
+  let changed = !!c.unread;
+  c.unread = 0;
   for (const m of c.msgs) {
     if (m.sys || m.from === me.id || m.readAt) continue;
     m.readAt = now; changed = true;
@@ -1634,6 +1653,7 @@ async function markRead(c) {
   }
   if (!changed) return;
   save();
+  closeNotification("conv:" + c.id); // seen now
   for (const [author, ids] of byAuthor) {
     if (!S.contacts[author]) continue;
     for (let i = 0; i < ids.length; i += 100) {
@@ -1674,6 +1694,79 @@ async function openVerify(cid) {
     el("div", { className: "safety", ariaLabel: "Security number" }, ...numbers.map((n) => el("span", { textContent: n }))),
     ct.verified ? el("p", { className: "hint", textContent: `You've already verified ${ct.name}.` }) : null,
     el("div", { className: "actions" }, done));
+}
+
+// ---------- notifications ----------
+// Shown for new messages and calls while P2P Chat is open but not in front (another
+// tab, another window, or minimized). A closed app can't receive anything, see PRODUCT.md.
+const notifyEl = $("notify"), notifyTextEl = $("notifyText");
+const notifPermission = () => ("Notification" in window ? Notification.permission : "unsupported");
+notifyEl.checked = store.get("p2pchat.notify", "") === "1" && notifPermission() === "granted";
+notifyTextEl.checked = store.get("p2pchat.notifyText", "1") === "1";
+const NOTIFY_BLOCKED = "Your browser blocks notifications for P2P Chat. Allow them in the site settings (the icon left of the address), then turn this on again. On Android, also check Settings → Apps → Chrome → Notifications.";
+let swReg = null;
+const pageNotes = new Map(); // tag -> Notification, when there's no service worker (e.g. opened from disk)
+
+async function ensureWorker() {
+  if (swReg || !("serviceWorker" in navigator) || !/^https?:$/.test(location.protocol)) return swReg;
+  try { await navigator.serviceWorker.register("sw.js"); swReg = await navigator.serviceWorker.ready; }
+  catch (e) { swReg = null; }
+  return swReg;
+}
+async function setNotify(on) {
+  let msg = "";
+  if (on) {
+    let perm = notifPermission();
+    if (perm === "default") perm = await Notification.requestPermission();
+    if (perm !== "granted") { on = false; msg = perm === "denied" ? NOTIFY_BLOCKED : perm === "unsupported" ? "This browser can't show notifications." : ""; }
+    else await ensureWorker();
+  }
+  notifyEl.checked = on;
+  store.set("p2pchat.notify", on ? "1" : "");
+  renderNotify(msg);
+}
+function renderNotify(msg = "") {
+  const perm = notifPermission();
+  notifyEl.disabled = perm === "unsupported";
+  notifyTextEl.disabled = !notifyEl.checked;
+  $("notifyInfo").textContent = msg
+    || (perm === "unsupported" ? "This browser can't show notifications."
+      : perm === "denied" ? NOTIFY_BLOCKED
+      : "Get notified about new messages and calls while P2P Chat is open in another tab or window. Phones pause background tabs after a few minutes; after that, nothing arrives until you come back.");
+}
+const wantNotify = () => notifyEl.checked && notifPermission() === "granted" && (document.hidden || !document.hasFocus());
+// One notification per chat (tag): the newest replaces the previous one. Closing the old
+// one first works everywhere; replacing by tag alone sometimes drops the new one.
+async function notify(title, opts) {
+  try {
+    await closeNotification(opts.tag);
+    const reg = await ensureWorker();
+    if (reg) return await reg.showNotification(title, opts);
+    const n = new Notification(title, opts);
+    n.onclick = () => { window.focus(); n.close(); onNotificationClick(opts.data); };
+    pageNotes.set(opts.tag, n);
+  } catch (e) { console.error(e); }
+}
+async function closeNotification(tag) {
+  const n = pageNotes.get(tag);
+  if (n) { n.close(); pageNotes.delete(tag); }
+  if (swReg) try { for (const x of await swReg.getNotifications({ tag })) x.close(); } catch {}
+}
+function onNotificationClick(data) {
+  if (!data || !me || !active) return;
+  if (data.call && call) showCall();
+  else if (data.conv && S.convs[data.conv]) openConv(data.conv);
+}
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => {
+  if (e.data && e.data.t === "notificationclick") onNotificationClick(e.data.data);
+});
+function notifyMessage(c, from, text) {
+  if (!wantNotify()) return;
+  const n = c.unread || 1;
+  notify(c.type === "group" ? `${contactName(from)} in ${c.name}` : contactName(from), {
+    body: notifyTextEl.checked ? text.slice(0, 200) : n > 1 ? `${n} new messages` : "New message",
+    tag: "conv:" + c.id, data: { conv: c.id },
+  });
 }
 
 // ---------- calls ----------
@@ -1919,7 +2012,7 @@ async function startCall(cid, video) {
 async function acceptCall(withVideo) {
   const c = call;
   if (!c || c.state !== "incoming") return;
-  clearTimeout(c.ringTimer); stopTone();
+  clearTimeout(c.ringTimer); stopTone(); closeNotification("call");
   c.state = "connecting"; renderCall();
   let stream;
   try { stream = await getMedia(withVideo); }
@@ -1969,6 +2062,7 @@ function callNote(cid, text, missed) {
   addToConv(conv, { id: uid(), sys: true, text, ts: Date.now() });
   if (missed && (conv.id !== current || document.hidden)) conv.unread = (conv.unread || 0) + 1;
   save();
+  if (missed && wantNotify()) notify(contactName(cid), { body: text, tag: "conv:" + conv.id, data: { conv: conv.id } });
 }
 
 function endCallLocally(note, missed = false) {
@@ -1976,6 +2070,7 @@ function endCallLocally(note, missed = false) {
   if (!c) return;
   call = null;
   clearTimeout(c.ringTimer); clearInterval(c.tick); stopTone();
+  closeNotification("call");
   stopStream(c.local);
   const pc = c.peer.pc;
   if (pc.signalingState !== "closed") for (const s of pc.getSenders()) if (s.track) try { pc.removeTrack(s); } catch {}
@@ -2020,6 +2115,8 @@ function onCall(peer, p) {
     permState("microphone").then((s) => { if (call && call.id === id) { call.micBlocked = s === "denied"; renderCallTime(); } });
     startTone("in");
     $("announcer").textContent = `${who} is calling you.`;
+    if (wantNotify()) notify(`${who} is calling you`, { body: p.video ? "Video call" : "Voice call", tag: "call",
+      requireInteraction: true, data: { call: true, conv: dmId(peer.cid) } });
     showCall();
     return render();
   }
@@ -2625,6 +2722,9 @@ $("callCam").onclick = toggleCamera;
 $("callMin").onclick = minimizeCall;
 $("btnCallReturn").onclick = showCall;
 $("btnCallSetup").onclick = openCallSetup;
+notifyEl.addEventListener("change", () => setNotify(notifyEl.checked));
+window.addEventListener("focus", () => { if (me && active) render(); }); // marks the open chat as read
+notifyTextEl.addEventListener("change", () => store.set("p2pchat.notifyText", notifyTextEl.checked ? "1" : ""));
 meetEl.addEventListener("change", () => setMeet(meetEl.checked));
 relaysEl.addEventListener("change", () => { store.set("p2pchat.relays", relaysEl.value.trim()); relaysUpdate(); });
 $("btnCancelInvites").onclick = () => { S.invites = []; save(); resubscribe(); renderMeet(); };
@@ -2687,6 +2787,8 @@ let pendingJoin = null;
 function startApp() {
   renderAccount();
   renderCallAccess();
+  renderNotify();
+  if (notifyEl.checked) ensureWorker();
   render();
   relaysUpdate(); resubscribe();
   setInterval(() => { resubscribe(); announce(); }, 5 * 60 * 1000); // topics change daily; say hello again now and then

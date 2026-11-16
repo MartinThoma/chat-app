@@ -110,6 +110,16 @@ With **Use public meeting points** turned on (Network settings, or **Use a singl
 - **Details** shows when a message was sent, delivered and read. For a group message, it lists every member with "Read …", "Delivered …" or "Not delivered yet". For a received message: who sent it, when it was sent (by their clock), when it arrived and when you read it.
 - Messages from before 1.6 have no arrival or read times, and contacts with an older version don't send read receipts.
 
+### Notifications
+
+- **Show notifications** (sidebar section **Notifications**, or **Also turn on notifications** at the end of onboarding) asks the browser for permission once.
+- While P2P Chat is open but not in front (another tab, another window, minimized), new messages show a system notification with the sender (and the group) as title and the message as text. Each chat has one notification; a newer message replaces it, and opening the chat removes it.
+- **Include message text** (on by default) can be turned off for privacy: the notification then only says "New message" or "3 new messages".
+- Incoming calls show "Bob is calling you" until you answer, decline or the call ends; missed calls leave a "Missed voice call from Bob" notification.
+- Tapping a notification brings P2P Chat to the front and opens the chat or the call.
+- While the window isn't in front, messages also don't count as read, so no read receipt is sent until you come back.
+- If the browser blocks notifications, the section says where to allow them (site settings, and on Android the Chrome app's notification setting).
+
 ### Message delivery
 
 - Every message has a unique ID. Duplicates, for example from being passed on by several members, are ignored.
@@ -169,7 +179,8 @@ Only one tab can be connected and saving at a time. Opening the app in a second 
 - **No upgrade path from 1.1.** Version 1.2 introduced key-based accounts. Chats from 1.1 stay in the browser's storage, but the app doesn't show them, and 1.1 and 1.2 can't connect to each other.
 - **Calls are one-to-one.** There are no group calls yet, and nobody can join a running call.
 - **Calls need both people connected right now.** There's no ringing someone who isn't connected, and no voicemail.
-- **Not included:** files and images, reactions, editing, read receipts, typing indicators, push notifications.
+- **No notifications while the app is closed.** A closed tab runs no code and has no connections, so messages can't even arrive. Phones also pause background tabs after a few minutes. Push notifications would need the browser maker's push service and probably a small relay; see roadmap item E.
+- **Not included:** files and images, reactions, editing, typing indicators, push notifications while the app is closed.
 
 ## Protocol (for developers)
 

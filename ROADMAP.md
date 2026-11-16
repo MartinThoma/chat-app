@@ -42,3 +42,13 @@ Shipped in 1.5 with Nostr relays: invite links and automatic reconnection betwee
 
 - Every participant connects to every other participant, as in 1:1 calls. That works for small groups (about 4–6 people), because each browser sends its video to everyone.
 - Needs direct connections between all participants, so it depends on A: members who haven't swapped codes would connect through the group automatically.
+
+## E. Push notifications (optional)
+
+**Goal:** get notified, and receive messages, while P2P Chat is closed.
+
+- Web Push is the only way browsers wake a closed web app. Each browser uses its maker's push service (Google for Chrome and Android, Mozilla for Firefox, Apple for Safari). The existing `sw.js` would receive the push and show the notification.
+- Contacts exchange their push addresses while connected. Writing to someone who's offline sends them an encrypted push that carries the message itself, so it also adds offline delivery. Push services keep undelivered pushes for up to about four weeks.
+- **To check first:** whether a web page can send to push services directly. They probably don't allow it from web pages (CORS), which would mean running a small relay, for example a Cloudflare Worker. That's a server, so this would be opt-in, like meeting points.
+- **Privacy:** the push service sees when someone sends you a push, not the content.
+- On iPhones it only works when P2P Chat is added to the home screen (iOS 16.4 and later).

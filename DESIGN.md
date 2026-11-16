@@ -8,7 +8,7 @@ P2P Chat should feel like a familiar messenger: calm, quick to understand, nothi
 - **Quiet chrome, loud content.** Grays and white surfaces. Color is reserved for the accent (actions, my messages), status (connected, errors) and avatars.
 - **Say what will happen.** Buttons name their result ("Accept invite", "Leave and delete"). Hints explain the consequence ("They keep their copy").
 - **No motion.** Nothing animates. State changes appear instantly, which suits a tool that's often used for quick check-ins. The only moving things are live readings: video, and the microphone level bar in **Set up calls**.
-- **One file.** Only system fonts, no icon fonts, no images. Avatars are initials on colored backgrounds.
+- **One file.** Only system fonts, no icon fonts, no images. Avatars are initials on colored backgrounds. The only extra file is `sw.js`, a tiny service worker that exists because Chrome on Android shows notifications only through one.
 
 ## Color
 
@@ -76,7 +76,7 @@ The **call screen** is always dark (`#0e1116`, white text, secondary text `#c3c9
 - **Desktop (wider than 760px):** a sidebar of fixed width 320px next to the chat. Only the chat list and the message list scroll.
 - **Phone (760px and narrower):** one panel at a time. The chat list is the home screen. Opening a chat replaces it, and **←** goes back. Message bubbles may use 88% of the width instead of 75%.
 - **Side spacing** is 16px everywhere (top bar, sidebar sections, chat header, messages, composer).
-- **Sidebar footer:** the collapsible sections **Account** (backup, restore, account ID), **Calls** (access status, **Set up calls**) and **Network settings** sit below the chat list.
+- **Sidebar footer:** the collapsible sections **Account** (backup, restore, account ID), **Calls** (access status, **Set up calls**), **Notifications** (two checkboxes and an explanation) and **Network settings** sit below the chat list.
 
 ### Onboarding screen
 
