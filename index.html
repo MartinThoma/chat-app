@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P2P Chat</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #596173;
+    --border: #dde1e8; --accent: #2f6fed; --accent-text: #fff;
+    --mine: #2f6fed; --mine-text: #fff; --theirs: #eceff4; --theirs-text: #1d2330;
+    --ok: #1f9d55; --warn: #c98a00; --bad: #d64545;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --panel: #1b1f27; --text: #e4e7ee; --muted: #9aa2b3;
+      --border: #2c323e; --accent: #3d6fe0; --accent-text: #fff;
+      --mine: #3d6fe0; --mine-text: #fff; --theirs: #262b35; --theirs-text: #e4e7ee;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header .brand { margin-right: auto; display: flex; align-items: baseline; gap: 8px; }
+  header h1 { font-size: 22px; margin: 0; }
+  #ver { color: var(--muted); font-size: 12px; text-decoration: none; }
+  #ver:hover { text-decoration: underline; }
+  #update {
+    display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+    padding: 8px 16px; background: var(--accent); color: var(--accent-text);
+  }
+  #update[hidden] { display: none; }
+  #update button { padding: 3px 12px; }
+  header label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  input[type=text], textarea {
+    font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+  }
+  textarea { width: 100%; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  button {
+    font: inherit; cursor: pointer; border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 14px; background: var(--panel); color: var(--text);
+  }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  main { flex: 1; display: flex; min-height: 0; }
+  aside {
+    width: 340px; flex-shrink: 0; overflow-y: auto; padding: 16px;
+    background: var(--panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
+  .step { border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .step b { font-size: 16px; }
+  #peers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  #peers li { display: flex; align-items: center; gap: 8px; }
+  #peers li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #peers li button { padding: 2px 8px; font-size: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); flex-shrink: 0; }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  details .inner { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+  #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .msg { max-width: 75%; padding: 7px 12px; border-radius: 14px; background: var(--theirs); color: var(--theirs-text); align-self: flex-start; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .msg.mine { align-self: flex-end; background: var(--mine); color: var(--mine-text); }
+  .msg .meta { font-size: 12px; opacity: .85; margin-bottom: 2px; }
+  .sys { align-self: center; color: var(--muted); font-size: 12px; text-align: center; }
+  #composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--panel); }
+  #composer input { flex: 1; min-width: 0; }
+  #empty { margin: auto; text-align: center; color: var(--muted); max-width: 380px; padding: 16px; }
+
+  @media (max-width: 760px) {
+    main { flex-direction: column; }
+    aside { width: auto; border-right: 0; border-bottom: 1px solid var(--border); max-height: 55vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>P2P Chat</h1>
+    <a id="ver" href="https://github.com/MartinThoma/chat-app" target="_blank" rel="noopener" title="Source code"></a>
+  </div>
+  <label>Your name <input type="text" id="nick" maxlength="32" size="14"></label>
+</header>
+<div id="update" role="status" hidden>
+  <span id="updateText"></span>
+  <button type="button" id="btnUpdate">Reload now</button>
+</div>
+
+<main>
+  <aside>
+    <section>
+      <h2>Connect to someone</h2>
+      <div class="row">
+        <button class="primary" id="btnInvite">Create invite</button>
+        <button id="btnJoin">Join with invite</button>
+      </div>
+      <p class="hint">One person creates an invite and sends the code to the other (any messenger, email, …). The other person pastes it and sends a reply code back. That's all — no server is involved in the chat itself.</p>
+    </section>
+
+    <section id="flow"></section>
+
+    <section>
+      <h2>Peers</h2>
+      <ul id="peers"><li class="hint">Nobody connected yet.</li></ul>
+    </section>
+
+    <details>
+      <summary>Network settings</summary>
+      <div class="inner">
+        <label class="hint" for="stun">STUN server (only used to find out your public IP so you can connect across the internet. No messages pass through it. Leave empty for LAN-only / fully offline.)</label>
+        <input type="text" id="stun" placeholder="stun:stun.l.google.com:19302">
+        <label class="hint" for="myip">Your IP address (optional). Browsers hide your local IP behind a random “….local” name. If connecting on the same network fails, enter your LAN IP here (e.g. 192.168.1.23) and create a new code.</label>
+        <input type="text" id="myip" placeholder="e.g. 192.168.1.23">
+      </div>
+    </details>
+  </aside>
+
+  <section id="chat">
+    <div id="messages">
+      <div id="empty">Connect to a peer on the left, then start chatting.<br><br>Messages go directly between browsers, encrypted (DTLS), and are not stored anywhere.</div>
+    </div>
+    <form id="composer" autocomplete="off">
+      <input type="text" id="text" placeholder="Type a message…" disabled>
+      <button class="primary" id="btnSend" disabled>Send</button>
+    </form>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+// Must match version.json (use `make bump VERSION=x.y.z` to change both).
+const APP_VERSION = "1.0.0";
+
+// ---------- small helpers ----------
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
+const myId = uid();
+
+const nickEl = $("nick");
+nickEl.value = store.get("p2pchat.nick", "Guest-" + Math.floor(Math.random() * 1000));
+nickEl.addEventListener("change", () => {
+  nickEl.value = nickEl.value.trim() || "Guest";
+  store.set("p2pchat.nick", nickEl.value);
+  broadcast({ t: "hello", name: nickEl.value });
+});
+const stunEl = $("stun");
+stunEl.value = store.get("p2pchat.stun", "stun:stun.l.google.com:19302");
+stunEl.addEventListener("change", () => store.set("p2pchat.stun", stunEl.value.trim()));
+const ipEl = $("myip");
+ipEl.value = store.get("p2pchat.myip", "");
+ipEl.addEventListener("change", () => store.set("p2pchat.myip", ipEl.value.trim()));
+
+// Put the manually entered IP into our own connection info, in place of the
+// obfuscated mDNS host names (the port stays the same).
+function withMyIp(sdp) {
+  const ip = ipEl.value.trim();
+  if (!/^[0-9a-fA-F.:]+$/.test(ip)) return sdp;
+  return sdp.replace(/^(a=candidate:\S+ \d+ \S+ \d+ )[0-9a-f-]+\.local( .*)$/gm, `$1${ip}$2`);
+}
+
+// ---------- connection codes: JSON -> deflate -> base64url ----------
+const CODE_PREFIX = "P2PCHAT1:";
+
+async function encodeCode(obj) {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let out = bytes;
+  if (window.CompressionStream) {
+    const s = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    out = new Uint8Array(await new Response(s).arrayBuffer());
+  }
+  let bin = ""; out.forEach((b) => (bin += String.fromCharCode(b)));
+  return CODE_PREFIX + (window.CompressionStream ? "z" : "j") +
+    btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function decodeCode(code) {
+  code = code.replace(/\s+/g, "");
+  if (!code.startsWith(CODE_PREFIX)) throw new Error("This doesn't look like a P2P Chat code.");
+  const kind = code[CODE_PREFIX.length];
+  let b64 = code.slice(CODE_PREFIX.length + 1).replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  let text;
+  if (kind === "z") {
+    const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    text = await new Response(s).text();
+  } else {
+    text = new TextDecoder().decode(bytes);
+  }
+  return JSON.parse(text);
+}
+
+// ---------- WebRTC ----------
+const peers = new Map(); // key -> { pc, dc, name, status }
+
+function rtcConfig() {
+  const s = stunEl.value.trim();
+  return { iceServers: s ? s.split(/[\s,]+/).filter(Boolean).map((u) => ({ urls: u })) : [] };
+}
+
+// Wait until all ICE candidates (local IPs, and public IP via STUN) are gathered,
+// so that the whole connection info fits into a single copy-paste code.
+function gatherComplete(pc, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    if (pc.iceGatheringState === "complete") return resolve();
+    const done = () => { pc.removeEventListener("icegatheringstatechange", check); clearTimeout(t); resolve(); };
+    const check = () => { if (pc.iceGatheringState === "complete") done(); };
+    pc.addEventListener("icegatheringstatechange", check);
+    const t = setTimeout(done, timeoutMs); // don't hang forever on an unreachable STUN server
+  });
+}
+
+function newPeer() {
+  const key = uid();
+  const pc = new RTCPeerConnection(rtcConfig());
+  const peer = { key, pc, dc: null, name: "connecting…", status: "pending" };
+  peers.set(key, peer);
+  pc.addEventListener("connectionstatechange", () => {
+    if (["failed", "closed"].includes(pc.connectionState)) setStatus(peer, "bad");
+    if (pc.connectionState === "disconnected") setStatus(peer, "bad");
+  });
+  renderPeers();
+  return peer;
+}
+
+function attachChannel(peer, dc) {
+  peer.dc = dc;
+  dc.addEventListener("open", () => {
+    setStatus(peer, "ok");
+    dc.send(JSON.stringify({ t: "hello", name: nickEl.value, id: myId }));
+    clearFlow();
+  });
+  dc.addEventListener("close", () => {
+    if (peer.status !== "bad") sysMsg(`${peer.name} disconnected.`);
+    setStatus(peer, "bad");
+  });
+  dc.addEventListener("message", (e) => onData(peer, e.data));
+}
+
+// Invite side, step 1: create an offer code.
+async function createInvite() {
+  const peer = newPeer();
+  attachChannel(peer, peer.pc.createDataChannel("chat"));
+  await peer.pc.setLocalDescription(await peer.pc.createOffer());
+  await gatherComplete(peer.pc);
+  return { peer, code: await encodeCode({ type: "offer", sdp: withMyIp(peer.pc.localDescription.sdp) }) };
+}
+
+// Invite side, step 2: accept the answer code.
+async function acceptAnswer(peer, code) {
+  const d = await decodeCode(code);
+  if (d.type !== "answer") throw new Error("That's an invite code, not a reply code. You need the code your friend sends back.");
+  await peer.pc.setRemoteDescription(d);
+}
+
+// Join side: take an offer code, produce an answer code.
+async function joinWithInvite(code) {
+  const d = await decodeCode(code);
+  if (d.type !== "offer") throw new Error("That's a reply code. You need an invite code (created with “Create invite”).");
+  const peer = newPeer();
+  peer.pc.addEventListener("datachannel", (e) => attachChannel(peer, e.channel));
+  await peer.pc.setRemoteDescription(d);
+  await peer.pc.setLocalDescription(await peer.pc.createAnswer());
+  await gatherComplete(peer.pc);
+  return { peer, code: await encodeCode({ type: "answer", sdp: withMyIp(peer.pc.localDescription.sdp) }) };
+}
+
+function removePeer(peer) {
+  try { peer.dc && peer.dc.close(); } catch {}
+  try { peer.pc.close(); } catch {}
+  peers.delete(peer.key);
+  renderPeers(); updateComposer();
+}
+
+// ---------- chat protocol ----------
+// Messages are relayed to all other peers (with de-duplication), so a group
+// works even if not everybody is directly connected to everybody.
+const seen = new Set();
+
+function send(peer, obj) {
+  if (peer.dc && peer.dc.readyState === "open") peer.dc.send(JSON.stringify(obj));
+}
+function broadcast(obj, exceptKey) {
+  for (const p of peers.values()) if (p.key !== exceptKey) send(p, obj);
+}
+
+function onData(peer, raw) {
+  let m; try { m = JSON.parse(raw); } catch { return; }
+  if (m.t === "hello") {
+    const name = String(m.name || "Anonymous").slice(0, 32);
+    if (peer.name !== name) {
+      sysMsg(peer.name === "connecting…" ? `${name} joined.` : `${peer.name} is now ${name}.`);
+      peer.name = name; renderPeers();
+    }
+  } else if (m.t === "msg" && typeof m.text === "string" && m.id && !seen.has(m.id)) {
+    seen.add(m.id);
+    addMsg({ from: String(m.from || "?").slice(0, 32), text: m.text.slice(0, 10000), ts: m.ts, mine: false });
+    broadcast(m, peer.key);
+  }
+}
+
+function sendChat(text) {
+  const m = { t: "msg", id: uid(), from: nickEl.value, text, ts: Date.now() };
+  seen.add(m.id);
+  broadcast(m);
+  addMsg({ ...m, mine: true });
+}
+
+// ---------- UI ----------
+const msgs = $("messages");
+
+function stickToBottom(fn) {
+  const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40;
+  fn();
+  if (atBottom) msgs.scrollTop = msgs.scrollHeight;
+}
+function removeEmpty() { const e = $("empty"); if (e) e.remove(); }
+
+function addMsg({ from, text, ts, mine }) {
+  removeEmpty();
+  stickToBottom(() => {
+    const div = document.createElement("div");
+    div.className = "msg" + (mine ? " mine" : "");
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const time = new Date(Number(ts) || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    meta.textContent = (mine ? "You" : from) + " · " + time;
+    const body = document.createElement("div");
+    body.textContent = text;
+    div.append(meta, body);
+    msgs.append(div);
+  });
+  if (mine) msgs.scrollTop = msgs.scrollHeight;
+}
+
+function sysMsg(text) {
+  removeEmpty();
+  stickToBottom(() => {
+    const d = document.createElement("div");
+    d.className = "sys"; d.textContent = text;
+    msgs.append(d);
+  });
+}
+
+function setStatus(peer, s) {
+  if (peer.status === s) return;
+  peer.status = s;
+  renderPeers(); updateComposer();
+}
+
+function renderPeers() {
+  const ul = $("peers");
+  ul.replaceChildren();
+  if (!peers.size) {
+    const li = document.createElement("li"); li.className = "hint"; li.textContent = "Nobody connected yet.";
+    ul.append(li); return;
+  }
+  for (const p of peers.values()) {
+    const li = document.createElement("li");
+    const dot = document.createElement("span");
+    dot.className = "dot" + (p.status === "ok" ? " ok" : p.status === "bad" ? " bad" : "");
+    dot.title = p.status === "ok" ? "connected" : p.status === "bad" ? "disconnected" : "waiting";
+    const name = document.createElement("span");
+    name.className = "name"; name.textContent = p.name;
+    const x = document.createElement("button");
+    x.textContent = p.status === "ok" ? "Disconnect" : "Remove";
+    x.onclick = () => removePeer(p);
+    li.append(dot, name, x);
+    ul.append(li);
+  }
+}
+
+function updateComposer() {
+  const any = [...peers.values()].some((p) => p.status === "ok");
+  $("text").disabled = !any; $("btnSend").disabled = !any;
+  $("text").placeholder = any ? "Type a message…" : "Connect to a peer first";
+}
+
+// Connection wizard in the sidebar
+const flow = $("flow");
+let pendingInvite = null;
+
+function clearFlow() {
+  flow.replaceChildren();
+  pendingInvite = null;
+}
+
+function el(tag, props = {}, ...children) {
+  const e = Object.assign(document.createElement(tag), props);
+  e.append(...children);
+  return e;
+}
+
+function codeBox(code) {
+  const ta = el("textarea", { readOnly: true, rows: 5, value: code });
+  ta.addEventListener("focus", () => ta.select());
+  const copy = el("button", { type: "button", textContent: "Copy code" });
+  copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(code); }
+    catch { ta.select(); document.execCommand("copy"); }
+    copy.textContent = "Copied ✓";
+    setTimeout(() => (copy.textContent = "Copy code"), 1500);
+  };
+  return [ta, el("div", { className: "row" }, copy)];
+}
+
+function errorText(e) {
+  return el("div", { className: "hint", style: "color:var(--bad)", textContent: e.message || String(e) });
+}
+
+$("btnInvite").onclick = async () => {
+  if (pendingInvite && pendingInvite.status !== "ok") removePeer(pendingInvite);
+  clearFlow();
+  flow.append(el("div", { className: "step" }, el("b", { textContent: "Preparing invite…" })));
+  try {
+    const { peer, code } = await createInvite();
+    pendingInvite = peer;
+    const answer = el("textarea", { rows: 4, placeholder: "Paste the reply code here" });
+    const err = el("div");
+    const go = el("button", { type: "button", className: "primary", textContent: "Connect" });
+    go.onclick = async () => {
+      err.replaceChildren();
+      try {
+        go.disabled = true; go.textContent = "Connecting…";
+        await acceptAnswer(peer, answer.value);
+      } catch (e) { err.append(errorText(e)); go.disabled = false; go.textContent = "Connect"; }
+    };
+    flow.replaceChildren(
+      el("div", { className: "step" },
+        el("b", { textContent: "1. Send this invite code to your friend" }), ...codeBox(code)),
+      el("div", { className: "step" },
+        el("b", { textContent: "2. Paste their reply code" }), answer, err, el("div", { className: "row" }, go)),
+    );
+  } catch (e) { flow.replaceChildren(errorText(e)); }
+};
+
+$("btnJoin").onclick = () => {
+  if (pendingInvite && pendingInvite.status !== "ok") removePeer(pendingInvite);
+  clearFlow();
+  const offer = el("textarea", { rows: 4, placeholder: "Paste the invite code here" });
+  const err = el("div");
+  const go = el("button", { type: "button", className: "primary", textContent: "Create reply code" });
+  const step = el("div", { className: "step" },
+    el("b", { textContent: "1. Paste the invite code you received" }), offer, err, el("div", { className: "row" }, go));
+  go.onclick = async () => {
+    err.replaceChildren();
+    try {
+      go.disabled = true;
+      const { code } = await joinWithInvite(offer.value);
+      step.remove();
+      flow.append(el("div", { className: "step" },
+        el("b", { textContent: "2. Send this reply code back" }), ...codeBox(code),
+        el("div", { className: "hint", textContent: "The chat opens as soon as your friend pastes it." })));
+    } catch (e) { err.append(errorText(e)); go.disabled = false; }
+  };
+  flow.append(step);
+  offer.focus();
+};
+
+$("composer").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const t = $("text").value;
+  if (!t.trim()) return;
+  sendChat(t);
+  $("text").value = "";
+});
+
+window.addEventListener("beforeunload", () => { for (const p of peers.values()) try { p.pc.close(); } catch {} });
+
+// ---------- version & auto-update ----------
+// version.json is fetched bypassing every cache. If it names a different
+// version, the page refreshes its own cached copy and reloads — but only while
+// idle, because reloading drops all chat connections and pending invites.
+$("ver").textContent = "v" + APP_VERSION;
+
+const UPDATE_CHECK_MS = 5 * 60 * 1000;
+let latestVersion = null;
+
+function isIdle() {
+  return ![...peers.values()].some((p) => p.status !== "bad") && !flow.hasChildNodes();
+}
+
+async function applyUpdate() {
+  try { sessionStorage.setItem("p2pchat.reloadedFor", latestVersion); } catch {}
+  // Replace the (possibly stale) cached index.html before reloading.
+  try { await fetch(location.href.split("#")[0], { cache: "reload" }); } catch {}
+  location.reload();
+}
+
+async function checkForUpdate() {
+  if (location.protocol === "file:") return; // opened from disk: nothing to compare against
+  let remote;
+  try {
+    const res = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    remote = String((await res.json()).version || "");
+  } catch { return; } // offline or not deployed: just keep running
+  if (!remote || remote === APP_VERSION) return;
+  latestVersion = remote;
+
+  // Guard against a reload loop if a reload still didn't bring the new version
+  // (e.g. a CDN that hasn't caught up yet): then only show the banner.
+  let alreadyTried = false;
+  try { alreadyTried = sessionStorage.getItem("p2pchat.reloadedFor") === remote; } catch {}
+
+  if (isIdle() && !alreadyTried) return applyUpdate();
+  $("updateText").textContent = `Version ${remote} is available. Reloading ends your current chats.`;
+  $("update").hidden = false;
+}
+
+$("btnUpdate").onclick = applyUpdate;
+checkForUpdate();
+setInterval(checkForUpdate, UPDATE_CHECK_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
+
+updateComposer();
+</script>
+</body>
+</html>
