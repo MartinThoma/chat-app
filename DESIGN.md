@@ -37,11 +37,11 @@ Text meets WCAG AA contrast (4.5:1) against its background in both themes.
 ## Typography
 
 - **Font:** `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`, so the app looks native on every platform. Connection codes use `ui-monospace`.
-- **Scale:** three sizes only, each step at least 1.33× the previous one.
+- **Scale:** three sizes only, each step at least 1.33× the previous one, and the largest exactly twice the smallest.
 
 | Size | Used for |
 |---|---|
-| 22px / 600 | App title, welcome heading |
+| 24px / 600 | App title, welcome heading |
 | 16px / 400 and 600 | Body, messages, buttons, inputs, chat names, chat and dialog titles |
 | 12px | Hints, timestamps, previews, message details, system lines, badges, connection codes |
 
