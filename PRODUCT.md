@@ -101,6 +101,15 @@ With **Use public meeting points** turned on (Network settings, or **Use a singl
 - **One call at a time.** A second caller is told that you're on another call, and you get a missed-call note. If two people call each other at the same moment, the calls merge into one.
 - A call ends when the connection drops (with a note). Closing the tab hangs up properly.
 
+### Messages
+
+- Each message shows its time at the bottom right: when you sent it, or, for messages from others, when it arrived on your device. In groups, other people's messages show their name on top.
+- Your own messages show their status right of the time: **Not delivered** while waiting, **✓** delivered, **✓✓** read. In a group, ✓✓ means everyone has read it.
+- A message counts as read when its chat is on screen: the tab is visible, the chat is open (on phones, the chat panel is showing) and no call screen covers it. Your app then sends a read receipt to the author. Receipts are delivered like messages, so they arrive later if the author isn't connected.
+- **Selecting:** long-press a message (right-click on a computer, or Enter on a focused message) to select it. While something is selected, tapping other messages adds or removes them, and the chat header becomes a bar with **Copy**, **Details** (for one message) and **Delete**. ✕ or Escape ends the selection.
+- **Details** shows when a message was sent, delivered and read. For a group message, it lists every member with "Read …", "Delivered …" or "Not delivered yet". For a received message: who sent it, when it was sent (by their clock), when it arrived and when you read it.
+- Messages from before 1.6 have no arrival or read times, and contacts with an older version don't send read receipts.
+
 ### Message delivery
 
 - Every message has a unique ID. Duplicates, for example from being passed on by several members, are ignored.
@@ -110,6 +119,7 @@ With **Use public meeting points** turned on (Network settings, or **Use a singl
 
 ### Deleting
 
+- Deleting starts from a selection (see Messages), so several messages can be deleted at once. **Delete for everyone** is offered when all selected messages are your own.
 - **Delete for me** works on any message. It removes the message from this browser only.
 - **Delete for everyone** works on your own messages. The message becomes "This message was deleted." for everyone in the chat. If a recipient isn't connected, the deletion reaches them later, the same way messages do. If the message hadn't been delivered yet, it's simply never sent.
 - **Delete chat** removes a personal chat and all its messages from this browser. The other person keeps their copy. If they write again, the chat reappears.
@@ -175,6 +185,7 @@ All packets are JSON sent over a single WebRTC data channel per connection. The 
 | `call` | `a`, `call`, `video?`, `mic?`, `cam?` | Call control, never stored or acknowledged. `a` is `ring` (with `video`), `accept`, `decline`, `busy`, `end`, or `state` (with `mic` and `cam`, sent when they change). `call` is a random call ID. |
 | `rtc` | `desc` or `cand` | Adds or removes microphone and camera on the existing connection: an SDP offer or answer, or an ICE candidate. Collisions are resolved by "perfect negotiation": the side with the smaller account ID gives way. |
 | `rv` | `rv` | The meeting secret for this pair of contacts (32 random bytes, base64url). Sent by the side with the smaller account ID after every hello. |
+| `read` | `pid`, `from`, `to`, `ids[]`, `at`, `group?`, `sig` | Read receipt for up to 100 messages by `to`, read at `at` (reader's clock). Group receipts are only passed on to `to`. |
 | `ack` | `pid` | Confirms receipt. The sender removes the packet from its outbox. Not signed, because it only travels over the connection the identity was proven on. |
 
 - **Signatures:** ECDSA P-256 with SHA-256, over `p2pchat-packet\n` followed by the packet without `sig`, serialized as JSON with sorted keys and no `undefined` fields. Keys and signatures are base64url.

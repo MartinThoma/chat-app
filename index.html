@@ -127,18 +127,28 @@
   #btnBack { display: none; padding: 5px 10px; }
   #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
   .msg {
-    max-width: 75%; padding: 7px 12px; border-radius: 14px; align-self: flex-start;
+    max-width: 75%; padding: 6px 10px 6px 12px; border-radius: 14px; align-self: flex-start; cursor: default;
     background: var(--theirs); color: var(--theirs-text); overflow-wrap: anywhere; white-space: pre-wrap;
   }
   .msg.mine { align-self: flex-end; background: var(--mine); color: var(--mine-text); }
-  .msg .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: .85; margin-bottom: 2px; }
-  .msg.deleted .body { font-style: italic; opacity: .8; }
-  .msg-del {
-    font-size: 12px; padding: 0 2px; border: 0; background: transparent; color: inherit;
-    text-decoration: underline; opacity: 0; margin-left: auto;
+  .msg .sender { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .msg.deleted .text { font-style: italic; opacity: .8; }
+  /* Time and ticks sit at the bottom right: on the last line if there's room, else below it. */
+  .msg .foot { float: right; margin: 6px 0 -2px 12px; font-size: 12px; line-height: 1.2; opacity: .85; white-space: nowrap; }
+  .msg .ticks { margin-left: 4px; letter-spacing: -3px; padding-right: 3px; }
+  .msg .ticks.read { font-weight: 700; }
+  .msg:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  .msg.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
+  #messages.selecting .msg { cursor: pointer; }
+  #selBar .title { min-width: 0; }
+  @media (hover: none) { .msg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } }
+  .quote {
+    background: var(--bg); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; color: var(--muted);
+    white-space: pre-wrap; overflow-wrap: anywhere; max-height: 7.5em; overflow: hidden;
   }
-  .msg:hover .msg-del, .msg:focus-within .msg-del { opacity: 1; }
-  @media (hover: none) { .msg-del { opacity: 1; } }
+  .details { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; }
+  .details dt { color: var(--muted); }
+  .details dd { margin: 0; }
   .sys { align-self: center; color: var(--muted); font-size: 12px; text-align: center; max-width: 520px; }
   .sys.day { font-weight: 600; margin-top: 8px; }
   #composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--panel); }
@@ -333,7 +343,16 @@
       <button type="button" class="primary" id="btnWelcomeConnect">Connect to someone</button>
     </div>
     <div id="chatView" hidden>
-      <div class="chat-head">
+      <div class="chat-head" id="selBar" hidden>
+        <button type="button" id="selCancel" aria-label="Cancel selection">✕</button>
+        <div class="title"><h2 id="selCount" aria-live="polite"></h2></div>
+        <div id="selActions" class="row">
+          <button type="button" id="selCopy">Copy</button>
+          <button type="button" id="selInfo">Details</button>
+          <button type="button" id="selDel">Delete</button>
+        </div>
+      </div>
+      <div class="chat-head" id="chatHead">
         <button type="button" id="btnBack" aria-label="Back to chats">←</button>
         <div class="title">
           <h2 id="chatTitle"></h2>
@@ -459,7 +478,7 @@
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.5.1";
+const APP_VERSION = "1.6.0";
 const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
@@ -578,6 +597,9 @@ ipEl.addEventListener("change", () => store.set("p2pchat.myip", ipEl.value.trim(
 // ---------- saved state (this browser's localStorage only) ----------
 // contacts: { [userId]: { name, pub, lastSeen, verified } }
 // convs:    { [convId]: { id, type: "dm"|"group", peer?, name?, members?, msgs: [], unread, updated } }
+// msgs:     { id, from, text, ts (sent, author's clock), pending?, deleted?, sys?,
+//             mine: to: [ids], rcpt: { [userId]: { d: delivered, r: read } }
+//             theirs: rcvd (when it arrived here), readAt (when you saw it) }
 // outbox:   [{ to: userId, pkt, conv, ts }]  signed packets waiting for that person's ack
 // invites:  [{ id, secret, created, expires }]  open invite links (meeting points)
 // A contact's `rv` is a secret shared with them, used to find each other at meeting points.
@@ -1375,13 +1397,20 @@ function onAck(cid, pid) {
   for (const o of done) {
     if (o.pkt.t !== "msg") continue;
     const m = S.convs[o.conv] && S.convs[o.conv].msgs.find((x) => x.id === o.pkt.id);
-    if (m) m.pending = false;
+    if (!m) continue;
+    m.pending = false;
+    const r = ((m.rcpt ||= {})[cid] ||= {});
+    r.d ||= Date.now();
   }
   save();
 }
 function relay(src, p, c) {
   if (!c || c.type !== "group") return;
-  for (const q of okPeers()) if (q !== src && q.cid !== p.from && c.members.includes(q.cid)) sendPeer(q, p);
+  for (const q of okPeers()) {
+    if (q === src || q.cid === p.from || !c.members.includes(q.cid)) continue;
+    if (p.to && q.cid !== p.to) continue; // read receipts only go to the message's author
+    sendPeer(q, p);
+  }
 }
 
 // ---------- incoming packets ----------
@@ -1447,9 +1476,22 @@ async function onHello(peer, p) {
 function receivedMsg(c, p, from) {
   const id = clip(p.id, 64);
   if (!id || typeof p.text !== "string" || c.msgs.some((m) => m.id === id)) return;
-  addToConv(c, { id, from, text: p.text.slice(0, 10000), ts: Number(p.ts) || Date.now() });
+  addToConv(c, { id, from, text: p.text.slice(0, 10000), ts: Number(p.ts) || Date.now(), rcvd: Date.now() });
   const where = c.type === "group" ? ` in ${c.name}` : "";
   $("announcer").textContent = `${contactName(from)}${where}: ${p.text.slice(0, 300)}`;
+}
+// They read our messages: `at` is their clock, but never later than now.
+function receivedRead(c, p, from) {
+  if (!Array.isArray(p.ids)) return;
+  const at = Math.min(Number(p.at) || Date.now(), Date.now());
+  const ids = new Set(p.ids.slice(0, 200).map((x) => clip(x, 64)));
+  for (const m of c.msgs) {
+    if (!ids.has(m.id) || m.from !== me.id) continue;
+    const r = ((m.rcpt ||= {})[from] ||= {});
+    r.d ||= at; r.r ||= at;
+    m.pending = false;
+  }
+  save();
 }
 function receivedDelete(c, msgId, from) {
   const m = c.msgs.find((x) => x.id === msgId);
@@ -1461,6 +1503,7 @@ async function onDirectPacket(peer, p) {
   const c = ensureDm(peer.cid);
   if (p.t === "msg") receivedMsg(c, p, peer.cid);
   else if (p.t === "del") receivedDelete(c, p.id, peer.cid);
+  else if (p.t === "read") receivedRead(c, p, peer.cid);
   else return false;
   return true;
 }
@@ -1502,6 +1545,7 @@ async function onGroupPacket(peer, p) {
     if (!(await verifyPkt(p, S.contacts[from] && S.contacts[from].pub))) return false;
     if (p.t === "msg") receivedMsg(c, p, from);
     else if (p.t === "del") receivedDelete(c, p.id, from);
+    else if (p.t === "read") { if (p.to === me.id) receivedRead(c, p, from); }
     else if (p.t === "leave") {
       c.members = c.members.filter((x) => x !== from);
       sysNote(c, `${contactName(from)} left the group.`);
@@ -1513,7 +1557,7 @@ async function onGroupPacket(peer, p) {
 
 // ---------- actions ----------
 async function sendText(c, text) {
-  const m = { id: uid(), from: me.id, text, ts: Date.now(), pending: true };
+  const m = { id: uid(), from: me.id, text, ts: Date.now(), pending: true, to: recipients(c) };
   addToConv(c, m);
   render();
   const pkt = await signPkt({ t: "msg", pid: m.id, id: m.id, from: me.id, name: myName(), text, ts: m.ts,
@@ -1548,24 +1592,57 @@ async function addMembers(c, ids) {
   await sendGroupInfo(c);
 }
 
-async function deleteMessage(c, m) {
-  const mine = m.from === me.id && !m.deleted;
+async function deleteMessages(c, list) {
+  if (!list.length) return;
+  const one = list.length === 1, it = one ? "it" : "them";
+  const mine = list.every((m) => m.from === me.id && !m.deleted);
   const others = c.type === "dm" ? contactName(c.peer) : "the other members";
-  const v = await ask("Delete message?",
-    mine ? `“Delete for everyone” also removes it from ${others}'s chat. If they already read it, they may remember or have copied it.`
-         : "This removes the message from this browser only.",
+  const v = await ask(one ? "Delete message?" : `Delete ${list.length} messages?`,
+    mine ? `“Delete for everyone” also removes ${it} from ${others}'s chat. If they already read ${it}, they may remember or have copied ${it}.`
+         : `This removes ${one ? "the message" : "the messages"} from this browser only.`,
     [...(mine ? [["everyone", "Delete for everyone", "danger"]] : []),
      ["me", "Delete for me", mine ? "" : "danger"], ["cancel", "Cancel"]]);
   if (v === "me") {
-    c.msgs = c.msgs.filter((x) => x !== m);
+    c.msgs = c.msgs.filter((x) => !list.includes(x));
   } else if (v === "everyone") {
-    m.deleted = true; m.text = ""; m.pending = false;
-    S.outbox = S.outbox.filter((o) => !(o.pkt.t === "msg" && o.pkt.id === m.id)); // not delivered yet: just don't
-    const pkt = await signPkt({ t: "del", pid: uid(), id: m.id, from: me.id, group: c.type === "group" ? c.id : undefined });
-    seen.add(pkt.pid);
-    for (const cid of recipients(c)) deliver(cid, pkt, c.id);
+    for (const m of list) {
+      m.deleted = true; m.text = ""; m.pending = false;
+      S.outbox = S.outbox.filter((o) => !(o.pkt.t === "msg" && o.pkt.id === m.id)); // not delivered yet: just don't
+      const pkt = await signPkt({ t: "del", pid: uid(), id: m.id, from: me.id, group: c.type === "group" ? c.id : undefined });
+      seen.add(pkt.pid);
+      for (const cid of recipients(c)) deliver(cid, pkt, c.id);
+    }
   } else return;
+  selected.clear();
   save(); render();
+}
+
+// Read receipts: when a chat is on screen, its new messages count as read, and
+// their authors get a signed "read" packet (delivered like messages).
+const chatOnScreen = () => !document.hidden && !callDlg.open &&
+  (matchMedia("(min-width: 761px)").matches || document.body.classList.contains("show-chat"));
+async function markRead(c) {
+  if (!c || !chatOnScreen()) return;
+  const now = Date.now(), byAuthor = new Map();
+  let changed = false;
+  for (const m of c.msgs) {
+    if (m.sys || m.from === me.id || m.readAt) continue;
+    m.readAt = now; changed = true;
+    if (!m.rcvd || m.deleted) continue; // messages from before 1.6 don't get receipts
+    if (!byAuthor.has(m.from)) byAuthor.set(m.from, []);
+    byAuthor.get(m.from).push(m.id);
+  }
+  if (!changed) return;
+  save();
+  for (const [author, ids] of byAuthor) {
+    if (!S.contacts[author]) continue;
+    for (let i = 0; i < ids.length; i += 100) {
+      const pkt = await signPkt({ t: "read", pid: uid(), from: me.id, to: author, ids: ids.slice(i, i + 100), at: now,
+        group: c.type === "group" ? c.id : undefined });
+      seen.add(pkt.pid);
+      deliver(author, pkt, c.id);
+    }
+  }
 }
 
 async function deleteChat(c) {
@@ -2305,15 +2382,32 @@ function membersLine(c) {
   return ["You", ...others.map(contactName)].join(", ") + (online ? ` · ${online} connected` : " · nobody connected");
 }
 
+// Shown time: when I sent it, or when it arrived here.
+const shownTs = (m) => (m.from === me.id ? m.ts : m.rcvd || m.ts);
+function msgStatus(c, m) {
+  if (m.pending) return "pending";
+  const to = m.to || recipients(c), r = m.rcpt || {};
+  return to.length && to.every((id) => r[id] && r[id].r) ? "read" : "delivered";
+}
+const STATUS_TEXT = { pending: "not delivered yet", delivered: "delivered", read: "read" };
+
 function renderMsg(c, m) {
   if (m.sys) return el("div", { className: "sys", textContent: m.text });
   const mine = m.from === me.id;
-  const meta = (mine ? "You" : contactName(m.from)) + " · " + fmtTime(m.ts) + (m.pending ? " · Not delivered yet" : "");
-  return el("div", { className: "msg" + (mine ? " mine" : "") + (m.deleted ? " deleted" : "") },
-    el("div", { className: "meta" },
-      el("span", { textContent: meta }),
-      el("button", { type: "button", className: "msg-del", textContent: "Delete", ariaLabel: "Delete message", onclick: () => deleteMessage(c, m) })),
-    el("div", { className: "body", textContent: m.deleted ? "This message was deleted." : m.text }));
+  const st = mine ? msgStatus(c, m) : null;
+  const foot = el("span", { className: "foot" },
+    el("span", { className: "sr-only", textContent: mine ? "You, " : "" }),
+    el("span", { textContent: fmtTime(shownTs(m)) }),
+    st === "pending" ? el("span", { textContent: " · Not delivered" })
+      : st ? el("span", { className: "ticks" + (st === "read" ? " read" : ""), textContent: st === "read" ? "✓✓" : "✓", ariaHidden: "true" }) : null,
+    st && st !== "pending" ? el("span", { className: "sr-only", textContent: ", " + STATUS_TEXT[st] }) : null);
+  const b = el("div", { className: "msg" + (mine ? " mine" : "") + (m.deleted ? " deleted" : "") + (selected.has(m.id) ? " selected" : ""), tabIndex: 0 },
+    !mine && c.type === "group" ? el("div", { className: "sender", textContent: contactName(m.from) }) : null,
+    el("div", { className: "body" },
+      el("span", { className: "text", textContent: m.deleted ? "This message was deleted." : m.text }), foot));
+  b.dataset.id = m.id;
+  if (selected.size) b.setAttribute("aria-selected", String(selected.has(m.id)));
+  return b;
 }
 
 function renderChat() {
@@ -2321,6 +2415,18 @@ function renderChat() {
   $("welcome").hidden = !!c;
   $("chatView").hidden = !c;
   if (!c) return;
+
+  // Selection mode: the header turns into the action bar.
+  const sel = c.msgs.filter((m) => selected.has(m.id));
+  if (sel.length !== selected.size) selected = new Set(sel.map((m) => m.id)); // e.g. deleted meanwhile
+  $("chatHead").hidden = !!sel.length;
+  $("selBar").hidden = !sel.length;
+  msgs.classList.toggle("selecting", !!sel.length);
+  if (sel.length) {
+    $("selCount").textContent = sel.length === 1 ? "1 selected" : `${sel.length} selected`;
+    $("selInfo").hidden = sel.length !== 1;
+    $("selCopy").hidden = sel.every((m) => m.deleted);
+  }
 
   $("chatTitle").textContent = convName(c);
   const actions = [];
@@ -2344,6 +2450,8 @@ function renderChat() {
   actions.push(el("button", { type: "button", textContent: c.type === "group" ? "Leave group" : "Delete chat", onclick: () => deleteChat(c) }));
   $("chatActions").replaceChildren(...actions);
 
+  const focused = document.activeElement && document.activeElement.closest && document.activeElement.closest(".msg");
+  const focusId = focused && msgs.contains(focused) ? focused.dataset.id : null;
   const switched = msgs.dataset.conv !== c.id;
   const atBottom = switched || msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40;
   msgs.dataset.conv = c.id;
@@ -2353,7 +2461,7 @@ function renderChat() {
   }
   let lastDay = null;
   for (const m of c.msgs) {
-    const d = new Date(m.ts);
+    const d = new Date(m.sys ? m.ts : shownTs(m));
     const day = d.toDateString();
     if (day !== lastDay) {
       lastDay = day;
@@ -2364,6 +2472,95 @@ function renderChat() {
   }
   msgs.replaceChildren(...nodes);
   if (atBottom) msgs.scrollTop = msgs.scrollHeight;
+  if (focusId) { const f = msgs.querySelector(`.msg[data-id="${CSS.escape(focusId)}"]`); if (f) f.focus({ preventScroll: true }); }
+}
+
+// ---------- selecting messages: long press, right-click, or Enter ----------
+let selected = new Set();
+const selectedMsgs = () => { const c = current && S.convs[current]; return c ? c.msgs.filter((m) => selected.has(m.id)) : []; };
+function toggleSelect(id) {
+  if (!id) return;
+  if (selected.has(id)) selected.delete(id); else selected.add(id);
+  renderChat();
+}
+function clearSelection() { if (selected.size) { selected.clear(); renderChat(); } }
+
+let pressTimer = 0, pressAt = null, suppressClick = false, pressFired = false;
+msgs.addEventListener("pointerdown", (e) => {
+  suppressClick = false; pressFired = false;
+  const b = e.target.closest(".msg");
+  if (!b || e.button !== 0) return;
+  pressAt = { x: e.clientX, y: e.clientY };
+  clearTimeout(pressTimer);
+  pressTimer = setTimeout(() => {
+    pressAt = null; pressFired = true; suppressClick = true;
+    if (!selected.has(b.dataset.id)) toggleSelect(b.dataset.id);
+    if (navigator.vibrate) navigator.vibrate(15);
+  }, 450);
+});
+msgs.addEventListener("pointermove", (e) => {
+  if (pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) > 10) { clearTimeout(pressTimer); pressAt = null; }
+});
+for (const t of ["pointerup", "pointercancel", "pointerleave"]) msgs.addEventListener(t, () => { clearTimeout(pressTimer); pressAt = null; });
+msgs.addEventListener("contextmenu", (e) => { // right-click; Android also sends this on long press
+  const b = e.target.closest(".msg");
+  if (!b) return;
+  e.preventDefault();
+  if (!pressFired && !selected.has(b.dataset.id)) toggleSelect(b.dataset.id); // not twice for one long press
+});
+msgs.addEventListener("click", (e) => {
+  if (suppressClick) { suppressClick = false; return; } // the click that ends a long press
+  const b = e.target.closest(".msg");
+  if (b && selected.size) toggleSelect(b.dataset.id);
+});
+msgs.addEventListener("keydown", (e) => {
+  const b = e.target.closest(".msg");
+  if (b && (e.key === "Enter" || e.key === " " || e.key === "ContextMenu")) { e.preventDefault(); toggleSelect(b.dataset.id); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && selected.size && !document.querySelector("dialog[open]")) clearSelection();
+});
+$("selCancel").onclick = clearSelection;
+$("selDel").onclick = () => deleteMessages(S.convs[current], selectedMsgs());
+$("selCopy").onclick = async () => {
+  const text = selectedMsgs().filter((m) => !m.deleted).map((m) => m.text).join("\n\n");
+  try { await navigator.clipboard.writeText(text); $("announcer").textContent = "Copied."; } catch {}
+  clearSelection();
+};
+$("selInfo").onclick = () => { const m = selectedMsgs()[0]; if (m) openDetails(S.convs[current], m); };
+
+const fmtFull = (ts) => new Date(ts).toLocaleString([], { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+function openDetails(c, m) {
+  const rows = [];
+  const row = (k, v) => rows.push(el("dt", { textContent: k }), el("dd", { textContent: v }));
+  let note = "";
+  if (m.from === me.id) {
+    row("Sent", fmtFull(m.ts));
+    const r = m.rcpt || {};
+    const delivered = (x) => (x.d ? fmtFull(x.d) : m.pending ? "Not yet" : "Yes (time not recorded)");
+    if (c.type === "dm") {
+      const x = r[c.peer] || {};
+      row("Delivered", delivered(x));
+      row("Read", x.r ? fmtFull(x.r) : "Not yet");
+    } else {
+      for (const id of m.to || recipients(c)) {
+        const x = r[id] || {};
+        row(contactName(id), x.r ? "Read " + fmtFull(x.r) : x.d ? "Delivered " + fmtFull(x.d) : "Not delivered yet");
+      }
+    }
+    note = "“Read” is the time on the other person's device. People with P2P Chat older than 1.6 don't send read receipts.";
+  } else {
+    row("From", contactName(m.from));
+    row("Sent", fmtFull(m.ts));
+    row("Received", m.rcvd ? fmtFull(m.rcvd) : "Not recorded (before version 1.6)");
+    if (m.readAt) row("You read it", fmtFull(m.readAt));
+    note = "“Sent” is the time on the sender's device, so it can be off if their clock is.";
+  }
+  showForm("Message details",
+    el("p", { className: "quote", textContent: m.deleted ? "This message was deleted." : m.text.slice(0, 500) }),
+    el("dl", { className: "details" }, ...rows),
+    el("p", { className: "hint", textContent: note }));
+  clearSelection();
 }
 
 function renderAccount() {
@@ -2375,6 +2572,7 @@ function render() {
   if (!me) return;
   renderList();
   renderChat();
+  if (current) markRead(S.convs[current]);
   const unread = Object.values(S.convs).reduce((n, c) => n + (c.unread || 0), 0);
   document.title = call && call.state === "incoming" ? `${contactName(call.cid)} is calling… · P2P Chat`
     : unread ? `(${unread}) P2P Chat` : "P2P Chat";
@@ -2383,6 +2581,7 @@ function render() {
 function openConv(id) {
   const c = S.convs[id];
   if (!c) return;
+  if (current !== id) selected.clear();
   current = id;
   c.unread = 0;
   document.body.classList.add("show-chat");
@@ -2394,7 +2593,7 @@ function openConv(id) {
 $("btnConnect").onclick = openConnect;
 $("btnWelcomeConnect").onclick = openConnect;
 $("btnNewGroup").onclick = () => openPick("new");
-$("btnBack").onclick = () => { current = null; document.body.classList.remove("show-chat"); render(); };
+$("btnBack").onclick = () => { selected.clear(); current = null; document.body.classList.remove("show-chat"); render(); };
 $("btnBackup").onclick = () => showForm("Back up your account",
   el("p", { className: "hint", textContent: "Downloads your account key, contacts and chats as one encrypted file." }),
   backupForm(() => { $("formDlg").close(); }));

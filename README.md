@@ -18,6 +18,7 @@ Use it at **https://martin-thoma.com/chat-app/**, or run it yourself:
 - Optional meeting points: invite with a single link, and reconnect automatically after a reload. Uses public Nostr relays only to find each other; off by default.
 - Personal chats and group chats. Group members don't all need to be connected to each other: members pass messages on.
 - Messages written while someone isn't connected are sent when they reconnect, with a "Not delivered yet" marker until then.
+- Times and status on every message: ✓ delivered, ✓✓ read. Long-press a message to select it, then copy, delete or see when it was sent, delivered and read.
 - Delete a message for yourself, or your own message for everyone. Delete a chat, or leave a group.
 - Name, contacts and history survive closing the browser.
 - Light and dark mode, works on phones.

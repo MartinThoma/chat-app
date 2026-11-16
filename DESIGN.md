@@ -126,7 +126,11 @@ Disabled buttons are shown at 50% opacity.
 
 **Chat list row.** Avatar (40px) with a green online dot for connected people. Name in 16px bold, last activity time on the right (12px muted, a time for today, otherwise a date). One line of preview below ("You: …", "Bob: …", "Message deleted"). An unread count badge sits on the right. The open chat has the `--selected` background.
 
-**Message bubble.** The details line (12px, 85% opacity) holds sender, time and "Not delivered yet" while pending. A **Delete** link sits on the right of that line. It appears on hover or focus, and is always visible on touch screens. Deleted messages keep their bubble and read "This message was deleted." in italics.
+**Message bubble.** Text first. The time (12px, 85% opacity) floats at the bottom right: beside a short last line, or on its own line below. My messages add the status right of the time: "· Not delivered", ✓ (delivered) or ✓✓ (read, set slightly bolder). Screen readers hear "You, 13:46, read". In groups, other people's bubbles start with the sender's name in 12px bold. Deleted messages keep their bubble and read "This message was deleted." in italics.
+
+**Selection.** Long press (450ms, cancelled by moving more than 10px), right-click or Enter selects a bubble. Selected bubbles get a 3px accent outline with a 2px gap, so it also shows on my accent-colored bubbles. The chat header is replaced by the selection bar: ✕, "2 selected" (16px bold), and **Copy**, **Details**, **Delete** on the right. On touch screens, text in bubbles can't be selected by hand, so a long press never starts a text selection; **Copy** replaces that.
+
+**Message details.** A regular dialog: the message as muted text in a tinted box (`--bg`, 8px radius), then a two-column list (muted labels such as "Sent", "Delivered", "Read", or member names in groups; full date and time with seconds), then a short muted note about whose clock a time comes from.
 
 **System lines.** Centered 12px muted text for events such as "Alice added you to the group." Day headings ("Today", "Mon, Nov 16, 2026") are the same, set in bold.
 
