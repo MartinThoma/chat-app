@@ -43,9 +43,9 @@ On phones the order is intro, then setup, then how it works, so the setup form i
 
 ### Verifying contacts
 
-- Every personal chat has **Verify**. It shows a 30-digit security number computed from both account IDs, so both people see the same number.
+- Every personal chat has **Verify security number** in its chat details (⋮). It shows a 30-digit security number computed from both account IDs, so both people see the same number.
 - Comparing it in person or on a call proves that nobody tampered with the codes you swapped. **They match, mark as verified** marks the contact as "Verified ✓".
-- If a new contact connects with the same name as an existing one, the chat shows a note. That person may have created a new account, and "Verify" settles it.
+- If a new contact connects with the same name as an existing one, the chat shows a note. That person may have created a new account, and verifying the security number settles it.
 
 ### Connecting to someone
 
@@ -78,19 +78,22 @@ With **Use public meeting points** turned on (Network settings, or **Use a singl
 
 - There's one chat per person. It appears in the chat list as soon as you connect for the first time.
 - A green dot on the avatar shows that the person is connected right now.
-- If they're not connected, the chat header says so and offers **Reconnect**. You can keep writing. Messages are sent when you're connected again.
+- The chat header shows the name and status, a phone icon (**Call**), a camera icon (**Video call**) and **⋮** for the chat details. The call icons are disabled, with the reason as a tooltip, while the person isn't connected or you're already in a call.
+- **Chat details** (⋮): avatar, connection status, verified state and the start of the account ID, with **Reconnect** (while not connected), **Verify security number** (or **Show security number**) and **Delete chat**.
+- If they're not connected, the chat header says so. You can keep writing. Messages are sent when you're connected again.
 
 ### Group chats
 
 - **New group** asks for a name (optional) and lets you pick members from your contacts.
 - Any member can **add people** from their own contacts.
 - Members don't all need to be connected to each other. Every member passes group messages on to the other members they're connected to. If Alice is connected to Bob and Carol, Bob and Carol can chat in the group without ever swapping codes with each other.
+- The group header has only **⋮**. Its chat details list the members (who's connected right now) and offer **Add people** and **Leave group**.
 - **Leave group** removes you from the group for everyone and deletes the chat from your browser.
 - The group header lists the members and how many are connected right now.
 
 ### Calls
 
-- **Call** and **Video call** sit in the header of a personal chat while the other person is connected. Calls use the existing connection, so no new codes are needed. Sound and video go directly between the two browsers, encrypted, like messages.
+- The phone and camera icons in the header of a personal chat start a call while the other person is connected. Calls use the existing connection, so no new codes are needed. Sound and video go directly between the two browsers, encrypted, like messages.
 - The browser asks for microphone (and camera) access the first time, unless it was already allowed during onboarding or under **Set up calls**. The other person's phone only rings once that's granted.
 - **Set up calls** (sidebar section **Calls**) shows whether the microphone and camera are allowed, blocked or not asked yet. It asks for access, lets you pick which microphone and camera to use (remembered for calls), and tests them with a live level bar and a camera preview. Both switch off when the window closes.
 - **Blocked access:** browsers don't ask again once access was refused. The app then explains where to allow it (the site settings next to the address), and the error after a failed call offers **Set up calls**. An incoming call warns right away if the microphone is blocked.
@@ -132,7 +135,7 @@ With **Use public meeting points** turned on (Network settings, or **Use a singl
 - Deleting starts from a selection (see Messages), so several messages can be deleted at once. **Delete for everyone** is offered when all selected messages are your own.
 - **Delete for me** works on any message. It removes the message from this browser only.
 - **Delete for everyone** works on your own messages. The message becomes "This message was deleted." for everyone in the chat. If a recipient isn't connected, the deletion reaches them later, the same way messages do. If the message hadn't been delivered yet, it's simply never sent.
-- **Delete chat** removes a personal chat and all its messages from this browser. The other person keeps their copy. If they write again, the chat reappears.
+- **Delete chat** (in the chat details) removes a personal chat and all its messages from this browser. The other person keeps their copy. If they write again, the chat reappears.
 - **Leave group** works as described under group chats.
 - Every deletion asks for confirmation. The safe choice ("Cancel") has keyboard focus.
 

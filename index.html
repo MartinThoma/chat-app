@@ -123,8 +123,23 @@
   .chat-head .title { flex: 1; min-width: 160px; }
   .chat-head h2 { font-size: 16px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chat-head .sub { font-size: 12px; color: var(--muted); }
-  #chatActions { display: flex; gap: 8px; flex-wrap: wrap; }
-  #chatActions button { padding: 5px 12px; }
+  #chatActions { display: flex; gap: 4px; }
+  .icon-btn {
+    width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; background: transparent; color: var(--text);
+  }
+  .icon-btn:hover:not(:disabled) { background: var(--hover); }
+  .icon-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .icon-btn svg { width: 22px; height: 22px; }
+  .chat-info { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; margin: 4px 0 12px; }
+  .chat-info p { margin: 0; }
+  .avatar.big { width: 64px; height: 64px; font-size: 24px; margin-bottom: 4px; }
+  .member-list { list-style: none; padding: 0; margin: 0 0 12px; max-height: 260px; overflow-y: auto; }
+  .member-list li { display: flex; align-items: center; gap: 10px; padding: 6px 4px; }
+  .member-list .status { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .menu-list { display: flex; flex-direction: column; gap: 8px; }
+  .menu-list button { text-align: left; }
+  .menu-list .destructive { color: var(--bad); }
   #btnBack { display: none; padding: 5px 10px; }
   #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
   .msg {
@@ -487,7 +502,7 @@
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.8.0";
 const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
@@ -1470,7 +1485,7 @@ async function onHello(peer, p) {
   const known = S.contacts[id];
   if (!known) {
     const same = Object.entries(S.contacts).find(([cid, ct]) => ct.name.toLowerCase() === name.toLowerCase());
-    if (same) sysNote(ensureDm(id), `You already have a contact called ${same[1].name} with a different account. If this is the same person, they may have made a new account. Use “Verify” to be sure.`);
+    if (same) sysNote(ensureDm(id), `You already have a contact called ${same[1].name} with a different account. If this is the same person, they may have made a new account. Use “Verify security number” in the chat details (⋮) to be sure.`);
   }
   peer.cid = id;
   peer.caps = Array.isArray(p.caps) ? p.caps.filter((x) => typeof x === "string").slice(0, 20) : [];
@@ -1690,7 +1705,7 @@ async function openVerify(cid) {
     textContent: ct.verified ? "Close" : "They match, mark as verified",
     onclick: () => { if (!ct.verified) { ct.verified = true; sysNote(ensureDm(cid), `You verified ${ct.name}.`); save(); render(); } $("formDlg").close(); } });
   showForm(`Verify ${ct.name}`,
-    el("p", { className: "hint", textContent: `Compare this number with ${ct.name}, in person or on a call. In their app it's under “Verify” in your chat. If both match, your connection is really with ${ct.name}'s account and nobody tampered with the codes you swapped.` }),
+    el("p", { className: "hint", textContent: `Compare this number with ${ct.name}, in person or on a call. In their app it's under ⋮ → “Verify security number” in your chat. If both match, your connection is really with ${ct.name}'s account and nobody tampered with the codes you swapped.` }),
     el("div", { className: "safety", ariaLabel: "Security number" }, ...numbers.map((n) => el("span", { textContent: n }))),
     ct.verified ? el("p", { className: "hint", textContent: `You've already verified ${ct.name}.` }) : null,
     el("div", { className: "actions" }, done));
@@ -2533,19 +2548,20 @@ function renderChat() {
     $("chatSub").textContent = (on ? "Connected"
       : meetOn() && ct.rv ? `Not connected. You reconnect automatically when ${convName(c)} is online; your messages are sent then.`
       : "Not connected. Your messages are sent when you reconnect.") + (ct.verified ? " · Verified ✓" : "");
-    if (!on) actions.push(el("button", { type: "button", textContent: "Reconnect", onclick: openConnect }));
-    if (on && !call) actions.push(
-      el("button", { type: "button", textContent: "Call", onclick: () => startCall(c.peer, false) }),
-      el("button", { type: "button", textContent: "Video call", onclick: () => startCall(c.peer, true) }));
-    if (ct.pub) actions.push(el("button", { type: "button", textContent: ct.verified ? "Verified ✓" : "Verify", onclick: () => openVerify(c.peer) }));
+    // Call buttons stay in place; they're disabled while a call can't start.
+    const why = !on ? `${convName(c)} isn't connected` : call ? "You're already in a call" : "";
+    actions.push(
+      iconBtn("phone", "Call", () => startCall(c.peer, false), why),
+      iconBtn("video", "Video call", () => startCall(c.peer, true), why));
     $("text").placeholder = on ? "Type a message…" : `Message (sent when ${convName(c)} is connected)`;
   } else {
     $("chatSub").textContent = membersLine(c);
-    actions.push(el("button", { type: "button", textContent: "Add people", onclick: () => openPick("add", c) }));
     $("text").placeholder = "Message the group…";
   }
-  actions.push(el("button", { type: "button", textContent: c.type === "group" ? "Leave group" : "Delete chat", onclick: () => deleteChat(c) }));
+  actions.push(iconBtn("more", "Chat details", () => openChatDetails(c)));
+  const refocus = document.activeElement && $("chatActions").contains(document.activeElement) ? document.activeElement.ariaLabel : null;
   $("chatActions").replaceChildren(...actions);
+  if (refocus) { const f = actions.find((a) => a.ariaLabel === refocus && !a.disabled); if (f) f.focus(); }
 
   const focused = document.activeElement && document.activeElement.closest && document.activeElement.closest(".msg");
   const focusId = focused && msgs.contains(focused) ? focused.dataset.id : null;
@@ -2658,6 +2674,48 @@ function openDetails(c, m) {
     el("dl", { className: "details" }, ...rows),
     el("p", { className: "hint", textContent: note }));
   clearSelection();
+}
+
+// Icons: Feather (MIT license), inline so the app stays one file. Constant markup only.
+const ICONS = {
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+  video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
+};
+function iconBtn(name, label, onclick, disabledWhy = "") {
+  const b = el("button", { type: "button", className: "icon-btn", ariaLabel: label, title: disabledWhy || label, onclick, disabled: !!disabledWhy });
+  b.innerHTML = ICONS[name];
+  return b;
+}
+
+// Chat details (⋮): status, verifying, reconnecting and deleting; members for groups.
+function openChatDetails(c) {
+  const dlg = $("formDlg");
+  const item = (label, action, cls = "") => el("button", { type: "button", className: cls, textContent: label, onclick: action });
+  const items = [];
+  let head, extra = null;
+  if (c.type === "dm") {
+    const ct = S.contacts[c.peer] || {}, on = isOnline(c.peer);
+    head = el("div", { className: "chat-info" },
+      avatar(c.peer, convName(c), on, "big"),
+      el("p", { textContent: (on ? "Connected" : "Not connected") + (ct.verified ? " · Verified ✓" : "") }),
+      el("p", { className: "hint", textContent: `Account ID ${c.peer.slice(0, 10)}…` }));
+    if (!on) items.push(item("Reconnect", () => { dlg.close(); openConnect(); }));
+    if (ct.pub) items.push(item(ct.verified ? "Show security number" : "Verify security number", () => openVerify(c.peer)));
+    items.push(item("Delete chat", () => { dlg.close(); deleteChat(c); }, "destructive"));
+  } else {
+    head = el("div", { className: "chat-info" },
+      avatar(c.id, c.name, false, "group big"),
+      el("p", { className: "hint", textContent: membersLine(c).replace(/^.*? · /, `${c.members.length} members · `) }));
+    const ids = [me.id, ...c.members.filter((id) => id !== me.id).sort((a, b) => contactName(a).localeCompare(contactName(b)))];
+    extra = el("ul", { className: "member-list", ariaLabel: "Members" }, ...ids.map((id) => el("li", {},
+      avatar(id, contactName(id), id !== me.id && isOnline(id), "small"),
+      el("span", { textContent: id === me.id ? "You" : contactName(id) }),
+      el("span", { className: "status", textContent: id === me.id ? "" : isOnline(id) ? "Connected" : "" }))));
+    items.push(item("Add people", () => { dlg.close(); openPick("add", c); }));
+    items.push(item("Leave group", () => { dlg.close(); deleteChat(c); }, "destructive"));
+  }
+  showForm(convName(c), head, extra, el("div", { className: "menu-list" }, ...items));
 }
 
 function renderAccount() {

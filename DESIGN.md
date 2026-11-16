@@ -8,7 +8,7 @@ P2P Chat should feel like a familiar messenger: calm, quick to understand, nothi
 - **Quiet chrome, loud content.** Grays and white surfaces. Color is reserved for the accent (actions, my messages), status (connected, errors) and avatars.
 - **Say what will happen.** Buttons name their result ("Accept invite", "Leave and delete"). Hints explain the consequence ("They keep their copy").
 - **No motion.** Nothing animates. State changes appear instantly, which suits a tool that's often used for quick check-ins. The only moving things are live readings: video, and the microphone level bar in **Set up calls**.
-- **One file.** Only system fonts, no icon fonts, no images. Avatars are initials on colored backgrounds. The only extra file is `sw.js`, a tiny service worker that exists because Chrome on Android shows notifications only through one.
+- **One file.** Only system fonts, no icon fonts, no image files. The few icons (phone, camera, ⋮) are inline SVGs from Feather (MIT license), drawn with `currentColor` so they follow the theme. Avatars are initials on colored backgrounds. The only extra file is `sw.js`, a tiny service worker that exists because Chrome on Android shows notifications only through one.
 
 ## Color
 
@@ -59,8 +59,8 @@ The **call screen** is always dark (`#0e1116`, white text, secondary text `#c3c9
 ┌──────────────────────────────────────────────────────────┐
 │ P2P Chat v1.2.0                       Your name [Alice]  │  top bar
 ├────────────────────┬─────────────────────────────────────┤
-│ [Connect] [New grp]│ Trip                [Add] [Leave]   │  chat header
-│ ● Trip      13:46  │ You, Bob · 1 connected              │
+│ [Connect] [New grp]│ Bob                    ☎  ▭◁  ⋮    │  chat header
+│ ● Trip      13:46  │ Connected                           │
 │   Bob: see you!    ├─────────────────────────────────────┤
 │ ● Bob       13:40  │            Today                    │
 │ ● Carol     Nov 14 │ ┌────────────┐                      │
@@ -126,6 +126,10 @@ Disabled buttons are shown at 50% opacity.
 
 **Chat list row.** Avatar (40px) with a green online dot for connected people. Name in 16px bold, last activity time on the right (12px muted, a time for today, otherwise a date). One line of preview below ("You: …", "Bob: …", "Message deleted"). An unread count badge sits on the right. The open chat has the `--selected` background.
 
+**Chat header.** Name (16px bold) and status (12px muted) on the left. On the right, 40px round icon buttons without a border: phone and camera (personal chats only) and ⋮. Icons are 22px, in the text color; hover shows the `--hover` circle. Disabled call icons stay in place at 50% opacity, so the header never shifts.
+
+**Chat details dialog.** Opened with ⋮. A centered 64px avatar (rounded square for groups) with the status below; for groups, the member list (28px avatars, "Connected" on the right). Then a column of full-width, left-aligned buttons: the normal actions first, the destructive one ("Delete chat", "Leave group") last in red text. Destructive actions still ask for confirmation.
+
 **Message bubble.** Text first. The time (12px, 85% opacity) floats at the bottom right: beside a short last line, or on its own line below. My messages add the status right of the time: "· Not delivered", ✓ (delivered) or ✓✓ (read, set slightly bolder). Screen readers hear "You, 13:46, read". In groups, other people's bubbles start with the sender's name in 12px bold. Deleted messages keep their bubble and read "This message was deleted." in italics.
 
 **Selection.** Long press (450ms, cancelled by moving more than 10px), right-click or Enter selects a bubble. Selected bubbles get a 3px accent outline with a 2px gap, so it also shows on my accent-colored bubbles. The chat header is replaced by the selection bar: ✕, "2 selected" (16px bold), and **Copy**, **Details**, **Delete** on the right. On touch screens, text in bubbles can't be selected by hand, so a long press never starts a text selection; **Copy** replaces that.
@@ -175,5 +179,5 @@ Disabled buttons are shown at 50% opacity.
 - Every control can be reached with the keyboard. Dialogs trap focus, because `showModal()` does that.
 - Confirmation dialogs put focus on the safe choice.
 - New incoming messages are announced through a hidden `aria-live="polite"` area ("Bob in Trip: see you!"). The message list itself is not a live region, because it's redrawn on every change and would otherwise be read out again in full.
-- Buttons that only show an icon (✕, ←, Delete on a message) have an `aria-label`.
+- Buttons that only show an icon (✕, ←, phone, camera, ⋮) have an `aria-label`, and a `title` tooltip with the same text, or with the reason when disabled.
 - Contrast is WCAG AA in light and dark mode.
