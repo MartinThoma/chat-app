@@ -7,7 +7,7 @@ P2P Chat should feel like a familiar messenger: calm, quick to understand, nothi
 - **Familiar over novel.** Chat list on the left, conversation on the right, my messages on the right in the accent color.
 - **Quiet chrome, loud content.** Grays and white surfaces. Color is reserved for the accent (actions, my messages), status (connected, errors) and avatars.
 - **Say what will happen.** Buttons name their result ("Accept invite", "Leave and delete"). Hints explain the consequence ("They keep their copy").
-- **No motion.** Nothing animates. State changes appear instantly, which suits a tool that's often used for quick check-ins.
+- **No motion.** Nothing animates. State changes appear instantly, which suits a tool that's often used for quick check-ins. The only moving things are live readings: video, and the microphone level bar in **Set up calls**.
 - **One file.** Only system fonts, no icon fonts, no images. Avatars are initials on colored backgrounds.
 
 ## Color
@@ -76,7 +76,7 @@ The **call screen** is always dark (`#0e1116`, white text, secondary text `#c3c9
 - **Desktop (wider than 760px):** a sidebar of fixed width 320px next to the chat. Only the chat list and the message list scroll.
 - **Phone (760px and narrower):** one panel at a time. The chat list is the home screen. Opening a chat replaces it, and **←** goes back. Message bubbles may use 88% of the width instead of 75%.
 - **Side spacing** is 16px everywhere (top bar, sidebar sections, chat header, messages, composer).
-- **Sidebar footer:** the collapsible sections **Account** (backup, restore, account ID) and **Network settings** sit below the chat list.
+- **Sidebar footer:** the collapsible sections **Account** (backup, restore, account ID), **Calls** (access status, **Set up calls**) and **Network settings** sit below the chat list.
 
 ### Onboarding screen
 
@@ -84,7 +84,7 @@ The **call screen** is always dark (`#0e1116`, white text, secondary text `#c3c9
 ┌──────────────────────────────────────────────────────────┐
 │ P2P Chat                                                 │
 │                                  ┌────────────────────┐  │
-│ Chat directly.                   │ Step 1 of 2        │  │
+│ Chat directly.                   │ Step 1 of 3        │  │
 │ No server.                       │ Create your account│  │
 │ No sign-up.            (48px)    │ Your name [      ] │  │
 │ Messages go straight from …      │ [ Create account ] │  │
@@ -99,7 +99,7 @@ The **call screen** is always dark (`#0e1116`, white text, secondary text `#c3c9
 - **Phones (860px and narrower):** one column in the order intro, setup card, how it works, so the form appears early. The headline drops to 24px.
 - **The headline** is set on three fixed lines. "sign-up" uses a non-breaking hyphen, so it never splits.
 - **"How it works" items** are numbered with 32px circles (`--selected` fill), a bold title and muted text.
-- **The setup card** is a panel with a 14px radius, a soft shadow and 28px padding. It has a small "Step 1 of 2" label, a 24px title, a muted explanation, and full-width buttons with one primary action. "Skip for now" and "Back" are text links, so they don't compete with it.
+- **The setup card** is a panel with a 14px radius, a soft shadow and 28px padding. It has a small "Step 1 of 3" label, a 24px title, a muted explanation, and full-width buttons with one primary action. "Skip for now" and "Back" are text links, so they don't compete with it.
 - **The "Backup saved" confirmation** uses a green check circle next to the title.
 
 ## Shape and spacing
@@ -142,6 +142,8 @@ Disabled buttons are shown at 50% opacity.
 - Your own camera shows as a mirrored 176px preview at the bottom right (104px on phones). It's hidden while your camera is off.
 - Buttons are text pills in one centered row at the bottom, wrapping on phones: translucent white for **Mute**, **Turn camera on/off** and **Show chat**; red for **Hang up** and **Decline**; green (`--call`) for **Accept**. **Mute** turns solid white while you're muted, so the state is visible at a glance.
 - Escape goes back to the chat instead of hanging up.
+
+**Set up calls dialog.** A regular dialog: a muted line about what's used and when (or, when blocked, where to allow it), then **Allow microphone and camera** as the primary button. Once allowed, it shows a microphone picker with a native `<meter>` level bar under it, a camera picker, and a mirrored 4:3 camera preview with an 8px radius.
 
 **Call bar.** A full-width green strip (`--call`) under the top bar while a call runs in the background: "Call with Bob · 3:12" with **Return to call** and **Hang up**.
 

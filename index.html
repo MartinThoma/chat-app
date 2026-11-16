@@ -32,7 +32,7 @@
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     display: flex; flex-direction: column;
   }
-  input[type=text], input[type=password], textarea {
+  input[type=text], input[type=password], textarea, select {
     font: inherit; color: var(--text); background: var(--bg);
     border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
   }
@@ -203,6 +203,10 @@
     .call-controls button { padding: 10px 16px; }
   }
 
+  .call-test { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .call-test select, .call-test meter { width: 100%; }
+  .call-test meter { height: 16px; }
+  .call-test video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #000; transform: scaleX(-1); }
   .safety { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; gap: 8px 20px; margin: 16px 0; font: 600 24px/1.2 ui-monospace, monospace; }
 
   /* full-screen pages: onboarding, insecure, second tab */
@@ -291,6 +295,13 @@
           <button type="button" id="btnBackup">Back up account</button>
           <button type="button" id="btnRestore">Restore from backup</button>
         </div>
+      </div>
+    </details>
+    <details class="side-section" id="callSettings">
+      <summary>Calls</summary>
+      <div class="inner">
+        <p class="hint" id="callAccess"></p>
+        <div class="row"><button type="button" id="btnCallSetup">Set up calls</button></div>
       </div>
     </details>
     <details class="side-section" id="settings">
@@ -436,7 +447,7 @@
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
@@ -702,7 +713,7 @@ const obViews = {
     const err = el("div", { className: "error", role: "alert" });
     const go = el("button", { type: "submit", className: "primary", textContent: "Create account" });
     const form = el("form", {},
-      el("p", { className: "step-label", textContent: "Step 1 of 2" }),
+      el("p", { className: "step-label", textContent: "Step 1 of 3" }),
       el("h2", { textContent: "Create your account" }),
       el("p", { textContent: "Pick the name your friends will see. You can change it any time." }),
       field("Your name", name), err, el("div", { className: "actions" }, go));
@@ -724,21 +735,46 @@ const obViews = {
   },
   backup() {
     return [
-      el("p", { className: "step-label", textContent: "Step 2 of 2" }),
+      el("p", { className: "step-label", textContent: "Step 2 of 3" }),
       el("h2", { textContent: "Back up your account" }),
       el("p", { textContent: "Your account exists only in this browser. If you clear your browser data or lose this device, it's gone, unless you have a backup. You can also use the backup to move to another device." }),
       backupForm(() => obShow("saved")),
-      el("div", { className: "actions" }, el("button", { type: "button", className: "link", textContent: "Skip for now", onclick: finishOnboarding })),
+      el("div", { className: "actions" }, el("button", { type: "button", className: "link", textContent: "Skip for now", onclick: () => obShow("calls") })),
       el("p", { className: "hint", textContent: "You can back up later under Account in the sidebar." }),
     ];
   },
   saved() {
-    const go = el("button", { type: "button", className: "primary", textContent: "Start chatting", onclick: finishOnboarding });
+    const go = el("button", { type: "button", className: "primary", textContent: "Continue", onclick: () => obShow("calls") });
     setTimeout(() => go.focus());
     return [
       el("h2", { className: "ob-ok", textContent: "Backup saved" }),
       el("p", { textContent: "Keep the file and its password somewhere safe, for example in your password manager. Anyone with both can use your account." }),
       el("div", { className: "actions" }, go),
+    ];
+  },
+  calls() {
+    const err = el("div", { className: "error", role: "alert" });
+    const go = el("button", { type: "button", className: "primary", textContent: "Allow microphone and camera" });
+    go.onclick = async () => {
+      err.textContent = ""; go.disabled = true; go.textContent = "Waiting for your browser…";
+      try {
+        const cam = await requestCallAccess();
+        const done = el("button", { type: "button", className: "primary", textContent: "Start chatting", onclick: finishOnboarding });
+        obCard.replaceChildren(
+          el("h2", { className: "ob-ok", textContent: "Calls are ready" }),
+          el("p", { textContent: cam ? "Your microphone and camera are allowed. They're only switched on during a call."
+            : "Your microphone is allowed. No camera was found, so your calls will be voice only." }),
+          el("div", { className: "actions" }, done));
+        done.focus();
+      } catch (e) { err.textContent = mediaError(e); go.disabled = false; go.textContent = "Try again"; }
+    };
+    return [
+      el("p", { className: "step-label", textContent: "Step 3 of 3" }),
+      el("h2", { textContent: "Allow calls" }),
+      el("p", { textContent: "You can call your contacts with voice or video. Your browser asks whether P2P Chat may use your microphone and camera. They're only switched on during a call." }),
+      err, el("div", { className: "actions" }, go),
+      el("div", { className: "actions" }, el("button", { type: "button", className: "link", textContent: "Skip for now", onclick: finishOnboarding })),
+      el("p", { className: "hint", textContent: "You can do this later with “Set up calls” in the sidebar." }),
     ];
   },
   restore() {
@@ -1238,7 +1274,7 @@ function attachTrack(pc, track, stream) {
 
 async function getMedia(video) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error("unsupported"), { name: "Unsupported" });
-  try { return await navigator.mediaDevices.getUserMedia({ audio: true, video: video ? VIDEO : false }); }
+  try { return await navigator.mediaDevices.getUserMedia({ audio: audioConstraint(), video: video ? videoConstraint() : false }); }
   catch (e) {
     if (video && e.name !== "NotAllowedError" && e.name !== "SecurityError") return getMedia(false); // no usable camera: voice only
     throw e;
@@ -1247,11 +1283,119 @@ async function getMedia(video) {
 function mediaError(e, what = "microphone") {
   if (e.name === "Unsupported") return "This browser can't make calls.";
   if (e.name === "NotAllowedError" || e.name === "SecurityError")
-    return `P2P Chat isn't allowed to use your ${what}. Allow it in your browser's site settings (usually behind the icon left of the address), then try again.`;
+    return `P2P Chat isn't allowed to use your ${what}. If your browser doesn't ask again, open its site settings (the icon left of the address, or the browser menu → Site settings), allow the microphone and camera, then try again.`;
   if (e.name === "NotFoundError" || e.name === "OverconstrainedError") return `No ${what} found. Connect one and try again.`;
   if (e.name === "NotReadableError" || e.name === "AbortError") return `Your ${what} can't be opened. Another app may be using it.`;
   return `Couldn't start your ${what}: ${e.message || e.name}`;
 }
+// Preferred devices, chosen in "Set up calls". "ideal" falls back to another device if it's gone.
+const devicePref = (k) => store.get("p2pchat." + k, "");
+const audioConstraint = () => (devicePref("mic") ? { deviceId: { ideal: devicePref("mic") } } : true);
+const videoConstraint = () => ({ ...VIDEO, ...(devicePref("cam") ? { deviceId: { ideal: devicePref("cam") } } : {}) });
+
+async function permState(name) {
+  try { return (await navigator.permissions.query({ name })).state; } catch { return ""; } // not supported everywhere
+}
+// Ask for microphone and camera once, so the browser doesn't have to ask during a call.
+async function requestCallAccess() {
+  const s = await getMedia(true);
+  const cam = s.getVideoTracks().length > 0;
+  stopStream(s);
+  renderCallAccess();
+  return cam;
+}
+async function mediaNotice(title, e, what) {
+  if ((await ask(title, mediaError(e, what), [["setup", "Set up calls"], ["ok", "OK"]])) === "setup") openCallSetup();
+}
+
+const PERM_TEXT = { granted: "allowed", denied: "blocked", prompt: "not asked yet" };
+async function renderCallAccess() {
+  const [m, c] = await Promise.all([permState("microphone"), permState("camera")]);
+  $("callAccess").textContent = m || c
+    ? `Microphone: ${PERM_TEXT[m] || "unknown"} · Camera: ${PERM_TEXT[c] || "unknown"}`
+    : "Allow your microphone and camera, test them and choose which ones to use.";
+}
+for (const name of ["microphone", "camera"]) {
+  try { navigator.permissions.query({ name }).then((st) => { st.onchange = renderCallAccess; }, () => {}); } catch {}
+}
+
+function openCallSetup() {
+  const status = el("p", { className: "hint" });
+  const err = el("div", { className: "error", role: "alert" });
+  const allow = el("button", { type: "button", className: "primary", textContent: "Allow microphone and camera" });
+  const mic = el("select"), cam = el("select");
+  const level = el("meter", { min: 0, max: 1, value: 0, ariaLabel: "Microphone level" });
+  const preview = el("video", { autoplay: true, muted: true, playsInline: true });
+  const camField = field("Camera", cam);
+  const test = el("div", { className: "call-test", hidden: true },
+    field("Microphone", mic), level,
+    el("p", { className: "hint", textContent: "Say something: the bar moves when your microphone works." }),
+    camField, preview);
+  let stream = null, actx = null, raf = 0, open = true;
+  const stop = () => {
+    cancelAnimationFrame(raf); stopStream(stream); stream = null;
+    if (actx) actx.close().catch(() => {}); actx = null;
+  };
+  async function updateStatus() {
+    const m = await permState("microphone");
+    status.textContent = m === "denied"
+      ? "Your browser blocks the microphone for P2P Chat and won't ask again by itself. Open its site settings (the icon left of the address, or the browser menu → Site settings), allow the microphone and camera, then come back here."
+      : "Calls use your microphone and, for video calls, your camera. They're only switched on during a call, and while this window is open.";
+  }
+  async function run() {
+    stop(); err.textContent = "";
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error("unsupported"), { name: "Unsupported" });
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint(), video: videoConstraint() }); }
+      catch (e) {
+        if (e.name === "NotAllowedError" || e.name === "SecurityError") throw e;
+        stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint() }); // no usable camera
+      }
+    } catch (e) {
+      err.textContent = mediaError(e); allow.hidden = false; test.hidden = true; updateStatus(); renderCallAccess();
+      return;
+    }
+    if (!open) return stop();
+    allow.hidden = true; test.hidden = false;
+    const vt = stream.getVideoTracks()[0], at = stream.getAudioTracks()[0];
+    preview.hidden = !vt;
+    preview.srcObject = vt ? new MediaStream([vt]) : null;
+    // Device names are only available once access is allowed.
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const fill = (sel, kind, track, word) => {
+      const list = devices.filter((d) => d.kind === kind && d.deviceId);
+      sel.replaceChildren(...list.map((d, i) => el("option", { value: d.deviceId, textContent: d.label || `${word} ${i + 1}` })));
+      if (track && track.getSettings().deviceId) sel.value = track.getSettings().deviceId;
+      return list.length;
+    };
+    fill(mic, "audioinput", at, "Microphone");
+    camField.hidden = !fill(cam, "videoinput", vt, "Camera");
+    // Live microphone level.
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      const an = actx.createAnalyser(); an.fftSize = 1024;
+      actx.createMediaStreamSource(stream).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      const tick = () => {
+        an.getFloatTimeDomainData(buf);
+        let sum = 0; for (const v of buf) sum += v * v;
+        level.value = Math.min(1, Math.sqrt(sum / buf.length) * 5);
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch {}
+    updateStatus(); renderCallAccess();
+  }
+  mic.onchange = () => { store.set("p2pchat.mic", mic.value); run(); };
+  cam.onchange = () => { store.set("p2pchat.cam", cam.value); run(); };
+  allow.onclick = run;
+  showForm("Set up calls", status, err, el("div", { className: "actions" }, allow), test);
+  $("formDlg").addEventListener("close", () => { open = false; stop(); }, { once: true });
+  updateStatus();
+  // If access is already allowed, start the test right away (no prompt appears).
+  permState("microphone").then((s) => { if (s === "granted" && open) run(); });
+}
+
 function useLocal(stream) {
   call.local = stream;
   call.cam = stream.getVideoTracks().length > 0;
@@ -1270,7 +1414,7 @@ async function startCall(cid, video) {
   try { stream = await getMedia(video); }
   catch (e) {
     if (call === c) endCallLocally(null);
-    return notice("Can't start the call", mediaError(e));
+    return mediaNotice("Can't start the call", e);
   }
   if (call !== c) return stopStream(stream); // cancelled while the browser asked for permission
   useLocal(stream);
@@ -1291,7 +1435,7 @@ async function acceptCall(withVideo) {
   try { stream = await getMedia(withVideo); }
   catch (e) {
     if (call === c) { sendCall(c, "decline"); endCallLocally(`Missed ${callKind(c).toLowerCase()} from ${contactName(c.cid)}.`); }
-    return notice("Can't answer the call", mediaError(e));
+    return mediaNotice("Can't answer the call", e);
   }
   if (call !== c) return stopStream(stream); // they hung up meanwhile
   useLocal(stream);
@@ -1383,6 +1527,7 @@ function onCall(peer, p) {
     call = { id, cid: peer.cid, peer, dir: "in", video: !!p.video, state: "incoming", rang: true, local: null, mic: true, cam: false, remoteMic: true, remoteCam: !!p.video };
     // Safety net in case their "end" never arrives.
     call.ringTimer = setTimeout(() => { if (call && call.id === id && call.state === "incoming") endCallLocally(`Missed ${kind} from ${who}.`, true); }, CALL_RING_MS + 15000);
+    permState("microphone").then((s) => { if (call && call.id === id) { call.micBlocked = s === "denied"; renderCallTime(); } });
     startTone("in");
     $("announcer").textContent = `${who} is calling you.`;
     showCall();
@@ -1421,8 +1566,8 @@ async function toggleCamera() {
       c.cam = false;
     } else {
       let track;
-      try { track = (await navigator.mediaDevices.getUserMedia({ video: VIDEO })).getVideoTracks()[0]; }
-      catch (e) { notice("Can't turn on the camera", mediaError(e, "camera")); return; }
+      try { track = (await navigator.mediaDevices.getUserMedia({ video: videoConstraint() })).getVideoTracks()[0]; }
+      catch (e) { mediaNotice("Can't turn on the camera", e, "camera"); return; }
       if (call !== c) { track.stop(); return; }
       c.local.addTrack(track);
       if (c.state === "active") attachTrack(c.peer.pc, track, c.local);
@@ -1449,7 +1594,8 @@ function minimizeCall() {
 }
 
 function callStatusText(c) {
-  if (c.state === "incoming") return c.video ? "Incoming video call…" : "Incoming voice call…";
+  if (c.state === "incoming") return (c.video ? "Incoming video call…" : "Incoming voice call…") +
+    (c.micBlocked ? " Your browser blocks the microphone: allow it in the site settings to answer." : "");
   if (c.state === "connecting") return "Connecting…";
   if (c.state === "ringing") return c.local ? "Calling…" : "Starting your microphone…";
   return callDuration(c) + (c.mic ? "" : " · You're muted") + (c.remoteMic ? "" : ` · ${contactName(c.cid)} is muted`);
@@ -1827,6 +1973,7 @@ $("callMic").onclick = toggleMic;
 $("callCam").onclick = toggleCamera;
 $("callMin").onclick = minimizeCall;
 $("btnCallReturn").onclick = showCall;
+$("btnCallSetup").onclick = openCallSetup;
 // Escape doesn't end a call: it goes back to the chat (or does nothing while ringing).
 callDlg.addEventListener("cancel", (e) => { e.preventDefault(); minimizeCall(); });
 
@@ -1874,6 +2021,7 @@ $("btnUpdate").onclick = applyUpdate;
 // ---------- start ----------
 function startApp() {
   renderAccount();
+  renderCallAccess();
   render();
   let restored = false;
   try { restored = sessionStorage.getItem("p2pchat.restored") === "1"; sessionStorage.removeItem("p2pchat.restored"); } catch {}

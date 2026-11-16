@@ -19,7 +19,8 @@ The first visit shows a welcome screen instead of the app:
 - **Left side:** what the app is ("Chat directly. No server. No sign-up.") and how it works in three steps: your account lives on this device, you connect by swapping a code, you chat while you're both online.
 - **Right side:** the account setup.
   1. **Create your account:** enter a name, then **Create account**. The key pair is created at this moment.
-  2. **Back up your account:** set a password and **Download backup**, or **Skip for now**. A confirmation screen follows, then **Start chatting**.
+  2. **Back up your account:** set a password and **Download backup**, or **Skip for now**. A confirmation screen follows, then **Continue**.
+  3. **Allow calls:** **Allow microphone and camera** makes the browser ask for access now, with an explanation, instead of in the middle of the first call. **Skip for now** is fine too. If access is refused, the step explains how to allow it in the site settings.
 - **Restore from a backup** is offered on the first step, for people who already have an account.
 
 On phones the order is intro, then setup, then how it works, so the setup form is visible without scrolling far.
@@ -79,7 +80,9 @@ Each code works only once. Mistakes give clear errors, for example "That's an in
 ### Calls
 
 - **Call** and **Video call** sit in the header of a personal chat while the other person is connected. Calls use the existing connection, so no new codes are needed. Sound and video go directly between the two browsers, encrypted, like messages.
-- The browser asks for microphone (and camera) access the first time. The other person's phone only rings once that's granted.
+- The browser asks for microphone (and camera) access the first time, unless it was already allowed during onboarding or under **Set up calls**. The other person's phone only rings once that's granted.
+- **Set up calls** (sidebar section **Calls**) shows whether the microphone and camera are allowed, blocked or not asked yet. It asks for access, lets you pick which microphone and camera to use (remembered for calls), and tests them with a live level bar and a camera preview. Both switch off when the window closes.
+- **Blocked access:** browsers don't ask again once access was refused. The app then explains where to allow it (the site settings next to the address), and the error after a failed call offers **Set up calls**. An incoming call warns right away if the microphone is blocked.
 - **Incoming call:** a full-screen view with the caller's name, a ring tone, and **Accept**, **Decline** and, for video calls, **Answer without video**. The tab title says who's calling. Unanswered calls stop ringing after 45 seconds.
 - **During a call:** **Mute**, **Turn camera on/off** (also in a voice call), **Show chat** and **Hang up**. The other side sees when you're muted, and sees your avatar instead of video while your camera is off. Without a camera, a video call continues as a voice call.
 - **Show chat** shrinks the call into a green bar above the app ("Call with Bob · 3:12", **Return to call**, **Hang up**), so you can keep writing.
