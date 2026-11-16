@@ -9,37 +9,26 @@
     --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #596173;
     --border: #dde1e8; --accent: #2f6fed; --accent-text: #fff;
     --mine: #2f6fed; --mine-text: #fff; --theirs: #eceff4; --theirs-text: #1d2330;
-    --ok: #1f9d55; --warn: #c98a00; --bad: #d64545;
+    --hover: #eef1f6; --selected: #e3e9f6;
+    --ok: #1f9d55; --bad: #c93636; --danger: #c93636; --danger-text: #fff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #12151b; --panel: #1b1f27; --text: #e4e7ee; --muted: #9aa2b3;
       --border: #2c323e; --accent: #3d6fe0; --accent-text: #fff;
       --mine: #3d6fe0; --mine-text: #fff; --theirs: #262b35; --theirs-text: #e4e7ee;
+      --hover: #222731; --selected: #29303d;
+      --ok: #3cbf74; --bad: #f07a7a;
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--bg); color: var(--text);
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     display: flex; flex-direction: column;
   }
-  header {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
-  }
-  header .brand { margin-right: auto; display: flex; align-items: baseline; gap: 8px; }
-  header h1 { font-size: 22px; margin: 0; }
-  #ver { color: var(--muted); font-size: 12px; text-decoration: none; }
-  #ver:hover { text-decoration: underline; }
-  #update {
-    display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
-    padding: 8px 16px; background: var(--accent); color: var(--accent-text);
-  }
-  #update[hidden] { display: none; }
-  #update button { padding: 3px 12px; }
-  header label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
   input[type=text], textarea {
     font: inherit; color: var(--text); background: var(--bg);
     border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
@@ -50,45 +39,137 @@
     padding: 7px 14px; background: var(--panel); color: var(--text);
   }
   button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button.danger { background: var(--danger); color: var(--danger-text); border-color: var(--danger); }
   button:disabled { opacity: .5; cursor: default; }
-  main { flex: 1; display: flex; min-height: 0; }
-  aside {
-    width: 340px; flex-shrink: 0; overflow-y: auto; padding: 16px;
-    background: var(--panel); border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; gap: 16px;
-  }
-  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
   .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
-  .step { border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-  .step b { font-size: 16px; }
-  #peers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  #peers li { display: flex; align-items: center; gap: 8px; }
-  #peers li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #peers li button { padding: 2px 8px; font-size: 12px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); flex-shrink: 0; }
-  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
-  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-  details .inner { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
 
+  /* top bar */
+  #topbar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  #topbar .brand { margin-right: auto; display: flex; align-items: baseline; gap: 8px; }
+  #topbar h1 { font-size: 22px; margin: 0; }
+  #ver { color: var(--muted); font-size: 12px; text-decoration: none; }
+  #ver:hover { text-decoration: underline; }
+  #topbar label { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  #update {
+    display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+    padding: 8px 16px; background: var(--accent); color: var(--accent-text);
+  }
+  #update button { padding: 3px 12px; }
+
+  /* layout */
+  main { flex: 1; display: flex; min-height: 0; }
+  #sidebar {
+    width: 320px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0;
+    background: var(--panel); border-right: 1px solid var(--border);
+  }
+  .side-actions { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .side-actions button { flex: 1; }
+  #convList { list-style: none; margin: 0; padding: 6px; overflow-y: auto; flex: 1; }
+  #convList .hint { padding: 10px; }
+  .conv {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 8px 10px; border: 0; border-radius: 10px; background: transparent;
+  }
+  .conv:hover { background: var(--hover); }
+  .conv[aria-current="true"] { background: var(--selected); }
+  .conv .info { flex: 1; min-width: 0; }
+  .conv .top { display: flex; gap: 8px; align-items: baseline; }
+  .conv .name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conv .time { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .conv .preview { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge {
+    min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; flex-shrink: 0;
+    background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 600;
+    display: grid; place-items: center;
+  }
+  .avatar {
+    position: relative; width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; color: #fff; font-weight: 600;
+  }
+  .avatar.group { border-radius: 12px; }
+  .avatar.small { width: 28px; height: 28px; font-size: 12px; }
+  .avatar .online {
+    position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--ok); border: 2px solid var(--panel);
+  }
+  #settings { border-top: 1px solid var(--border); padding: 10px 16px; }
+  #settings summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  #settings .inner { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+  /* chat */
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #welcome { margin: auto; text-align: center; color: var(--muted); max-width: 420px; padding: 16px; }
+  #welcome h2 { color: var(--text); font-size: 22px; margin: 0 0 8px; }
+  #chatView { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .chat-head {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  .chat-head .title { flex: 1; min-width: 160px; }
+  .chat-head h2 { font-size: 16px; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-head .sub { font-size: 12px; color: var(--muted); }
+  #chatActions { display: flex; gap: 8px; flex-wrap: wrap; }
+  #chatActions button { padding: 5px 12px; }
+  #btnBack { display: none; padding: 5px 10px; }
   #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-  .msg { max-width: 75%; padding: 7px 12px; border-radius: 14px; background: var(--theirs); color: var(--theirs-text); align-self: flex-start; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .msg {
+    max-width: 75%; padding: 7px 12px; border-radius: 14px; align-self: flex-start;
+    background: var(--theirs); color: var(--theirs-text); overflow-wrap: anywhere; white-space: pre-wrap;
+  }
   .msg.mine { align-self: flex-end; background: var(--mine); color: var(--mine-text); }
-  .msg .meta { font-size: 12px; opacity: .85; margin-bottom: 2px; }
+  .msg .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: .85; margin-bottom: 2px; }
+  .msg.deleted .body { font-style: italic; opacity: .8; }
+  .msg-del {
+    font-size: 12px; padding: 0 2px; border: 0; background: transparent; color: inherit;
+    text-decoration: underline; opacity: 0; margin-left: auto;
+  }
+  .msg:hover .msg-del, .msg:focus-within .msg-del { opacity: 1; }
+  @media (hover: none) { .msg-del { opacity: 1; } }
   .sys { align-self: center; color: var(--muted); font-size: 12px; text-align: center; }
+  .sys.day { font-weight: 600; margin-top: 8px; }
   #composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--panel); }
   #composer input { flex: 1; min-width: 0; }
-  #empty { margin: auto; text-align: center; color: var(--muted); max-width: 380px; padding: 16px; }
+
+  /* dialogs */
+  dialog {
+    width: min(460px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto;
+    padding: 20px; border: 1px solid var(--border); border-radius: 14px;
+    background: var(--panel); color: var(--text);
+  }
+  dialog::backdrop { background: rgb(0 0 0 / .45); }
+  dialog h2 { font-size: 16px; margin: 0 0 8px; }
+  dialog p { margin: 0 0 8px; }
+  dialog .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 16px; }
+  .dlg-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .dlg-head h2 { flex: 1; margin: 0; }
+  .step { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .step b { font-size: 16px; }
+  .error { color: var(--bad); font-size: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
+  .picklist { list-style: none; padding: 0; margin: 4px 0 0; max-height: 260px; overflow-y: auto; }
+  .picklist label { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-radius: 8px; cursor: pointer; }
+  .picklist label:hover { background: var(--hover); }
+  .picklist .status { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #inactive { position: fixed; inset: 0; z-index: 10; background: var(--bg); display: grid; place-items: center; padding: 16px; text-align: center; }
 
   @media (max-width: 760px) {
-    main { flex-direction: column; }
-    aside { width: auto; border-right: 0; border-bottom: 1px solid var(--border); max-height: 55vh; }
+    #sidebar { width: 100%; border-right: 0; }
+    #chat { display: none; }
+    body.show-chat #sidebar { display: none; }
+    body.show-chat #chat { display: flex; }
+    #btnBack { display: inline-block; }
+    .msg { max-width: 88%; }
   }
 </style>
 </head>
 <body>
-<header>
+<header id="topbar">
   <div class="brand">
     <h1>P2P Chat</h1>
     <a id="ver" href="https://github.com/MartinThoma/chat-app" target="_blank" rel="noopener" title="Source code"></a>
@@ -101,24 +182,13 @@
 </div>
 
 <main>
-  <aside>
-    <section>
-      <h2>Connect to someone</h2>
-      <div class="row">
-        <button class="primary" id="btnInvite">Create invite</button>
-        <button id="btnJoin">Join with invite</button>
-      </div>
-      <p class="hint">One person creates an invite and sends the code to the other (any messenger, email, …). The other person pastes it and sends a reply code back. That's all — no server is involved in the chat itself.</p>
-    </section>
-
-    <section id="flow"></section>
-
-    <section>
-      <h2>Peers</h2>
-      <ul id="peers"><li class="hint">Nobody connected yet.</li></ul>
-    </section>
-
-    <details>
+  <aside id="sidebar">
+    <div class="side-actions">
+      <button type="button" class="primary" id="btnConnect">Connect</button>
+      <button type="button" id="btnNewGroup">New group</button>
+    </div>
+    <ul id="convList" aria-label="Chats"></ul>
+    <details id="settings">
       <summary>Network settings</summary>
       <div class="inner">
         <label class="hint" for="stun">STUN server (only used to find out your public IP so you can connect across the internet. No messages pass through it. Leave empty for LAN-only / fully offline.)</label>
@@ -130,37 +200,108 @@
   </aside>
 
   <section id="chat">
-    <div id="messages">
-      <div id="empty">Connect to a peer on the left, then start chatting.<br><br>Messages go directly between browsers, encrypted (DTLS), and are not stored anywhere.</div>
+    <div id="welcome">
+      <h2>Chat without a server</h2>
+      <p>Connect to someone by swapping a short code. Messages go directly between your browsers, encrypted, and are saved only on your devices.</p>
+      <button type="button" class="primary" id="btnWelcomeConnect">Connect to someone</button>
     </div>
-    <form id="composer" autocomplete="off">
-      <input type="text" id="text" placeholder="Type a message…" disabled>
-      <button class="primary" id="btnSend" disabled>Send</button>
-    </form>
+    <div id="chatView" hidden>
+      <div class="chat-head">
+        <button type="button" id="btnBack" aria-label="Back to chats">←</button>
+        <div class="title">
+          <h2 id="chatTitle"></h2>
+          <div class="sub" id="chatSub"></div>
+        </div>
+        <div id="chatActions"></div>
+      </div>
+      <div id="messages"></div>
+      <form id="composer" autocomplete="off">
+        <input type="text" id="text" placeholder="Type a message…" maxlength="10000" aria-label="Message">
+        <button class="primary" id="btnSend">Send</button>
+      </form>
+    </div>
   </section>
 </main>
+
+<dialog id="connectDlg" aria-labelledby="connectTitle">
+  <div class="dlg-head">
+    <h2 id="connectTitle">Connect to someone</h2>
+    <form method="dialog"><button aria-label="Close">✕</button></form>
+  </div>
+  <p class="hint">One person creates an invite and sends the code to the other (any messenger, email, …). The other person accepts it and sends a reply code back. No server is involved in the chat itself.</p>
+  <div class="row">
+    <button type="button" class="primary" id="btnInvite">Create invite</button>
+    <button type="button" id="btnJoin">Join with invite</button>
+  </div>
+  <div id="flow"></div>
+</dialog>
+
+<dialog id="pickDlg" aria-labelledby="pickTitle">
+  <form method="dialog" id="pickForm">
+    <h2 id="pickTitle"></h2>
+    <label class="field" id="groupNameField">Group name
+      <input type="text" id="groupName" maxlength="60" placeholder="e.g. Weekend trip">
+    </label>
+    <div class="hint" id="pickHint"></div>
+    <ul class="picklist" id="pickList"></ul>
+    <div class="actions">
+      <button value="cancel">Cancel</button>
+      <button value="ok" class="primary" id="pickOk"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="askDlg" aria-labelledby="askTitle">
+  <form method="dialog">
+    <h2 id="askTitle"></h2>
+    <p class="hint" id="askText"></p>
+    <div class="actions" id="askActions"></div>
+  </form>
+</dialog>
+
+<!-- Screen readers hear new incoming messages here (the message list itself is redrawn on every change). -->
+<div id="announcer" class="sr-only" aria-live="polite"></div>
+
+<div id="inactive" hidden>
+  <div>
+    <p>P2P Chat is open in another tab.<br>Only one tab can be connected at a time.</p>
+    <button type="button" class="primary" onclick="location.reload()">Use here</button>
+  </div>
+</div>
 
 <script>
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.1.0";
 
-// ---------- small helpers ----------
+// ---------- helpers ----------
 const $ = (id) => document.getElementById(id);
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
-const myId = uid();
+const clip = (s, n) => (typeof s === "string" ? s.slice(0, n) : "");
+function el(tag, props = {}, ...children) {
+  const e = Object.assign(document.createElement(tag), props);
+  e.append(...children.filter((c) => c != null && c !== false));
+  return e;
+}
+const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+// ---------- identity & settings ----------
+// A random id that stays the same in this browser, so people are recognized when they reconnect.
+let myId = store.get("p2pchat.id", "");
+if (!myId) { myId = uid(); store.set("p2pchat.id", myId); }
 
 const nickEl = $("nick");
 nickEl.value = store.get("p2pchat.nick", "Guest-" + Math.floor(Math.random() * 1000));
+const myName = () => nickEl.value.trim() || "Guest";
 nickEl.addEventListener("change", () => {
-  nickEl.value = nickEl.value.trim() || "Guest";
+  nickEl.value = myName();
   store.set("p2pchat.nick", nickEl.value);
-  broadcast({ t: "hello", name: nickEl.value });
+  for (const p of okPeers()) sendPeer(p, helloPkt());
 });
 const stunEl = $("stun");
 stunEl.value = store.get("p2pchat.stun", "stun:stun.l.google.com:19302");
@@ -169,13 +310,79 @@ const ipEl = $("myip");
 ipEl.value = store.get("p2pchat.myip", "");
 ipEl.addEventListener("change", () => store.set("p2pchat.myip", ipEl.value.trim()));
 
-// Put the manually entered IP into our own connection info, in place of the
-// obfuscated mDNS host names (the port stays the same).
-function withMyIp(sdp) {
-  const ip = ipEl.value.trim();
-  if (!/^[0-9a-fA-F.:]+$/.test(ip)) return sdp;
-  return sdp.replace(/^(a=candidate:\S+ \d+ \S+ \d+ )[0-9a-f-]+\.local( .*)$/gm, `$1${ip}$2`);
+// ---------- saved state (this browser's localStorage only) ----------
+// contacts: { [userId]: { name, lastSeen } }
+// convs:    { [convId]: { id, type: "dm"|"group", peer?, name?, members?, msgs: [], unread, updated } }
+// outbox:   [{ to: userId, pkt, conv, ts }]  packets waiting for that person to connect
+const STATE_KEY = "p2pchat.state";
+const MAX_MSGS = 1000;                          // per chat
+const OUTBOX_TTL = 30 * 24 * 3600 * 1000;       // undelivered packets are dropped after 30 days
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STATE_KEY));
+    if (s && s.convs && s.contacts && Array.isArray(s.outbox)) return s;
+  } catch {}
+  return { contacts: {}, convs: {}, outbox: [] };
 }
+const S = loadState();
+let active = true;        // false once another tab took over
+let saveQueued = false;
+
+function save() {
+  if (!active || saveQueued) return;
+  saveQueued = true;
+  queueMicrotask(() => { saveQueued = false; writeState(); });
+}
+function writeState() {
+  if (!active) return;
+  for (const c of Object.values(S.convs)) if (c.msgs.length > MAX_MSGS) c.msgs = c.msgs.slice(-MAX_MSGS);
+  for (let i = 0; i < 12; i++) {
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(S)); return; }
+    catch (e) {
+      if (!e || e.name !== "QuotaExceededError") return; // storage unavailable: keep running in memory
+      const big = Object.values(S.convs).sort((a, b) => b.msgs.length - a.msgs.length)[0];
+      if (!big || big.msgs.length < 2) return;
+      big.msgs = big.msgs.slice(Math.floor(big.msgs.length / 2)); // storage full: drop oldest half of the biggest chat
+    }
+  }
+}
+window.addEventListener("pagehide", writeState);
+
+// Only one tab may be connected and write the state at a time: the newest tab wins.
+const tabId = uid();
+try {
+  const bc = new BroadcastChannel("p2pchat");
+  bc.onmessage = (e) => { if (e.data && e.data.t === "claim" && e.data.tab !== tabId) deactivate(); };
+  bc.postMessage({ t: "claim", tab: tabId });
+} catch {}
+function deactivate() {
+  if (!active) return;
+  writeState();
+  active = false;
+  for (const p of [...peers.values()]) removePeer(p);
+  for (const d of document.querySelectorAll("dialog[open]")) d.close();
+  $("inactive").hidden = false;
+}
+
+// ---------- conversations ----------
+const dmId = (cid) => "dm:" + cid;
+const contactName = (cid) => (cid === myId ? myName() : (S.contacts[cid] && S.contacts[cid].name) || "Unknown");
+const convName = (c) => (c.type === "dm" ? contactName(c.peer) : c.name);
+const recipients = (c) => (c.type === "dm" ? [c.peer] : c.members.filter((id) => id !== myId));
+let current = null; // open conversation id
+
+function ensureDm(cid) {
+  const id = dmId(cid);
+  return S.convs[id] || (S.convs[id] = { id, type: "dm", peer: cid, msgs: [], unread: 0, updated: Date.now() });
+}
+function addToConv(c, m) {
+  c.msgs.push(m);
+  c.updated = Date.now();
+  if (!m.sys && m.from !== myId && (c.id !== current || document.hidden)) c.unread = (c.unread || 0) + 1;
+  save();
+}
+const sysNote = (c, text) => addToConv(c, { id: uid(), sys: true, text, ts: Date.now() });
 
 // ---------- connection codes: JSON -> deflate -> base64url ----------
 const CODE_PREFIX = "P2PCHAT1:";
@@ -210,11 +417,19 @@ async function decodeCode(code) {
 }
 
 // ---------- WebRTC ----------
-const peers = new Map(); // key -> { pc, dc, name, status }
+const peers = new Map(); // key -> { key, pc, dc, cid, status: "pending"|"ok" }
 
 function rtcConfig() {
   const s = stunEl.value.trim();
   return { iceServers: s ? s.split(/[\s,]+/).filter(Boolean).map((u) => ({ urls: u })) : [] };
+}
+
+// Put the manually entered IP into our own connection info, in place of the
+// obfuscated mDNS host names (the port stays the same).
+function withMyIp(sdp) {
+  const ip = ipEl.value.trim();
+  if (!/^[0-9a-fA-F.:]+$/.test(ip)) return sdp;
+  return sdp.replace(/^(a=candidate:\S+ \d+ \S+ \d+ )[0-9a-f-]+\.local( .*)$/gm, `$1${ip}$2`);
 }
 
 // Wait until all ICE candidates (local IPs, and public IP via STUN) are gathered,
@@ -232,28 +447,28 @@ function gatherComplete(pc, timeoutMs = 4000) {
 function newPeer() {
   const key = uid();
   const pc = new RTCPeerConnection(rtcConfig());
-  const peer = { key, pc, dc: null, name: "connecting…", status: "pending" };
+  const peer = { key, pc, dc: null, cid: null, status: "pending" };
   peers.set(key, peer);
   pc.addEventListener("connectionstatechange", () => {
-    if (["failed", "closed"].includes(pc.connectionState)) setStatus(peer, "bad");
-    if (pc.connectionState === "disconnected") setStatus(peer, "bad");
+    if (["failed", "closed", "disconnected"].includes(pc.connectionState)) removePeer(peer);
   });
-  renderPeers();
   return peer;
 }
 
 function attachChannel(peer, dc) {
   peer.dc = dc;
-  dc.addEventListener("open", () => {
-    setStatus(peer, "ok");
-    dc.send(JSON.stringify({ t: "hello", name: nickEl.value, id: myId }));
-    clearFlow();
-  });
-  dc.addEventListener("close", () => {
-    if (peer.status !== "bad") sysMsg(`${peer.name} disconnected.`);
-    setStatus(peer, "bad");
-  });
+  dc.addEventListener("open", () => { peer.status = "ok"; sendPeer(peer, helloPkt()); });
+  dc.addEventListener("close", () => removePeer(peer));
   dc.addEventListener("message", (e) => onData(peer, e.data));
+}
+
+function removePeer(peer) {
+  if (!peers.has(peer.key)) return;
+  peers.delete(peer.key);
+  try { peer.dc && peer.dc.close(); } catch {}
+  try { peer.pc.close(); } catch {}
+  if (pendingPeer === peer) pendingPeer = null;
+  render();
 }
 
 // Invite side, step 1: create an offer code.
@@ -284,131 +499,238 @@ async function joinWithInvite(code) {
   return { peer, code: await encodeCode({ type: "answer", sdp: withMyIp(peer.pc.localDescription.sdp) }) };
 }
 
-function removePeer(peer) {
-  try { peer.dc && peer.dc.close(); } catch {}
-  try { peer.pc.close(); } catch {}
-  peers.delete(peer.key);
-  renderPeers(); updateComposer();
-}
-
-// ---------- chat protocol ----------
-// Messages are relayed to all other peers (with de-duplication), so a group
-// works even if not everybody is directly connected to everybody.
+// ---------- delivery ----------
+// Every packet we author stays in the outbox until the recipient acknowledges it
+// ({t:"ack", pid}). It's sent right away if they're connected, and again whenever
+// they connect, so nothing is lost when a connection dies silently (closed laptop,
+// network change). Receivers de-duplicate by pid / message id. Group packets are
+// additionally relayed by every member to the members they're connected to.
 const seen = new Set();
+const okPeers = () => [...peers.values()].filter((p) => p.status === "ok" && p.cid);
+function peerFor(cid) { for (const p of peers.values()) if (p.cid === cid && p.status === "ok") return p; return null; }
+const isOnline = (cid) => !!peerFor(cid);
+const helloPkt = () => ({ t: "hello", id: myId, name: myName(), v: APP_VERSION });
 
-function send(peer, obj) {
-  if (peer.dc && peer.dc.readyState === "open") peer.dc.send(JSON.stringify(obj));
+function sendPeer(peer, pkt) {
+  if (!peer.dc || peer.dc.readyState !== "open") return false;
+  try { peer.dc.send(JSON.stringify(pkt)); return true; } catch { return false; }
 }
-function broadcast(obj, exceptKey) {
-  for (const p of peers.values()) if (p.key !== exceptKey) send(p, obj);
+function deliver(cid, pkt, convId) {
+  S.outbox.push({ to: cid, pkt, conv: convId, ts: Date.now() });
+  save();
+  const p = peerFor(cid);
+  if (p) sendPeer(p, pkt);
+}
+function flushOutbox(cid) {
+  const p = peerFor(cid);
+  const now = Date.now();
+  S.outbox = S.outbox.filter((o) => now - o.ts < OUTBOX_TTL);
+  if (p) for (const o of S.outbox) if (o.to === cid) sendPeer(p, o.pkt);
+  save();
+}
+function onAck(cid, pid) {
+  const done = S.outbox.filter((o) => o.to === cid && o.pkt.pid === pid);
+  if (!done.length) return;
+  S.outbox = S.outbox.filter((o) => !done.includes(o));
+  for (const o of done) {
+    if (o.pkt.t !== "msg") continue;
+    const m = S.convs[o.conv] && S.convs[o.conv].msgs.find((x) => x.id === o.pkt.id);
+    if (m) m.pending = false;
+  }
+  save();
+}
+function relay(src, p, c) {
+  if (!p.pid || !c || c.type !== "group") return;
+  for (const q of okPeers()) if (q !== src && q.cid !== p.from && c.members.includes(q.cid)) sendPeer(q, p);
 }
 
+// ---------- incoming packets ----------
 function onData(peer, raw) {
-  let m; try { m = JSON.parse(raw); } catch { return; }
-  if (m.t === "hello") {
-    const name = String(m.name || "Anonymous").slice(0, 32);
-    if (peer.name !== name) {
-      sysMsg(peer.name === "connecting…" ? `${name} joined.` : `${peer.name} is now ${name}.`);
-      peer.name = name; renderPeers();
+  if (!active) return;
+  let p; try { p = JSON.parse(raw); } catch { return; }
+  if (!p || typeof p !== "object" || typeof p.t !== "string") return;
+  if (p.t === "hello") return onHello(peer, p);
+  if (!peer.cid) return; // must introduce itself first
+  if (p.t === "ack") { onAck(peer.cid, clip(p.pid, 64)); return render(); }
+  if (typeof p.pid !== "string") return;
+  sendPeer(peer, { t: "ack", pid: p.pid }); // ack duplicates too: the earlier ack may have been lost
+  if (seen.has(p.pid)) return;
+  seen.add(p.pid);
+  if (typeof p.group === "string") onGroupPacket(peer, p);
+  else onDirectPacket(peer, p);
+  render();
+}
+
+function onHello(peer, p) {
+  const id = clip(p.id, 64);
+  if (!id) return;
+  if (id === myId) return removePeer(peer); // connected to ourselves
+  const name = clip(p.name, 32).trim() || "Anonymous";
+  const known = S.contacts[id];
+  peer.cid = id;
+  S.contacts[id] = { name, lastSeen: Date.now() };
+  const c = ensureDm(id);
+  if (known && known.name !== name) sysNote(c, `${known.name} is now called ${name}.`);
+  save();
+  if (pendingPeer === peer) { pendingPeer = null; $("connectDlg").close(); openConv(c.id); }
+  flushOutbox(id);
+  render();
+}
+
+function receivedMsg(c, p, from) {
+  const id = clip(p.id, 64);
+  if (!id || typeof p.text !== "string" || c.msgs.some((m) => m.id === id)) return;
+  const ts = Number(p.ts) || Date.now();
+  addToConv(c, { id, from, text: p.text.slice(0, 10000), ts });
+  if (from === myId) return;
+  if (!S.contacts[from]) S.contacts[from] = { name: clip(p.name, 32) || "Unknown" };
+  const where = c.type === "group" ? ` in ${c.name}` : "";
+  $("announcer").textContent = `${contactName(from)}${where}: ${p.text.slice(0, 300)}`;
+}
+function receivedDelete(c, msgId, from) {
+  const m = c.msgs.find((x) => x.id === msgId);
+  if (m && m.from === from) { m.deleted = true; m.text = ""; save(); }
+}
+
+function onDirectPacket(peer, p) {
+  const c = ensureDm(peer.cid);
+  if (p.t === "msg") receivedMsg(c, p, peer.cid);
+  else if (p.t === "del") receivedDelete(c, p.id, peer.cid);
+}
+
+function onGroupPacket(peer, p) {
+  const gid = clip(p.group, 64);
+  const from = clip(p.from, 64);
+  let c = S.convs[gid];
+  if (p.t === "group") {
+    const members = (Array.isArray(p.members) ? p.members.slice(0, 100) : [])
+      .filter((x) => x && typeof x.id === "string")
+      .map((x) => ({ id: clip(x.id, 64), name: clip(x.name, 32) }));
+    if (!members.some((x) => x.id === myId)) return;
+    for (const x of members) if (x.id !== myId && !S.contacts[x.id]) S.contacts[x.id] = { name: x.name || "Unknown" };
+    const ids = members.map((x) => x.id);
+    if (!c) {
+      c = S.convs[gid] = { id: gid, type: "group", name: clip(p.gname, 60) || "Group", members: ids, msgs: [], unread: 0, updated: Date.now() };
+      sysNote(c, `${contactName(from)} added you to the group.`);
+      c.unread = (c.unread || 0) + (c.id === current ? 0 : 1);
+    } else if (c.type === "group") {
+      const added = ids.filter((id) => !c.members.includes(id));
+      c.members = [...new Set([...c.members, ...ids])];
+      if (added.length) sysNote(c, `${contactName(from)} added ${added.map(contactName).join(", ")}.`);
     }
-  } else if (m.t === "msg" && typeof m.text === "string" && m.id && !seen.has(m.id)) {
-    seen.add(m.id);
-    addMsg({ from: String(m.from || "?").slice(0, 32), text: m.text.slice(0, 10000), ts: m.ts, mine: false });
-    broadcast(m, peer.key);
+  } else {
+    if (!c || c.type !== "group" || !c.members.includes(myId)) return; // unknown group or we left it
+    if (p.t === "msg") receivedMsg(c, p, from);
+    else if (p.t === "del") receivedDelete(c, p.id, from);
+    else if (p.t === "leave" && c.members.includes(from)) {
+      c.members = c.members.filter((x) => x !== from);
+      sysNote(c, `${contactName(from)} left the group.`);
+    }
   }
+  relay(peer, p, S.convs[gid]);
 }
 
-function sendChat(text) {
-  const m = { t: "msg", id: uid(), from: nickEl.value, text, ts: Date.now() };
-  seen.add(m.id);
-  broadcast(m);
-  addMsg({ ...m, mine: true });
+// ---------- actions ----------
+function sendText(c, text) {
+  const m = { id: uid(), from: myId, text, ts: Date.now(), pending: true };
+  addToConv(c, m);
+  const pkt = { t: "msg", pid: m.id, id: m.id, from: myId, name: myName(), text, ts: m.ts };
+  if (c.type === "group") pkt.group = c.id;
+  seen.add(pkt.pid);
+  for (const cid of recipients(c)) deliver(cid, pkt, c.id);
+  if (!recipients(c).length) m.pending = false;
+  save(); render();
 }
 
-// ---------- UI ----------
-const msgs = $("messages");
-
-function stickToBottom(fn) {
-  const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40;
-  fn();
-  if (atBottom) msgs.scrollTop = msgs.scrollHeight;
-}
-function removeEmpty() { const e = $("empty"); if (e) e.remove(); }
-
-function addMsg({ from, text, ts, mine }) {
-  removeEmpty();
-  stickToBottom(() => {
-    const div = document.createElement("div");
-    div.className = "msg" + (mine ? " mine" : "");
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    const time = new Date(Number(ts) || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    meta.textContent = (mine ? "You" : from) + " · " + time;
-    const body = document.createElement("div");
-    body.textContent = text;
-    div.append(meta, body);
-    msgs.append(div);
-  });
-  if (mine) msgs.scrollTop = msgs.scrollHeight;
+function sendGroupInfo(c) {
+  const pkt = {
+    t: "group", pid: uid(), group: c.id, gname: c.name, from: myId,
+    members: c.members.map((id) => ({ id, name: contactName(id) })),
+  };
+  seen.add(pkt.pid);
+  for (const cid of recipients(c)) deliver(cid, pkt, c.id);
 }
 
-function sysMsg(text) {
-  removeEmpty();
-  stickToBottom(() => {
-    const d = document.createElement("div");
-    d.className = "sys"; d.textContent = text;
-    msgs.append(d);
-  });
+function createGroup(name, ids) {
+  const gid = uid();
+  const c = S.convs[gid] = { id: gid, type: "group", name, members: [myId, ...ids], msgs: [], unread: 0, updated: Date.now() };
+  sysNote(c, "You created the group.");
+  sendGroupInfo(c);
+  openConv(gid);
 }
 
-function setStatus(peer, s) {
-  if (peer.status === s) return;
-  peer.status = s;
-  renderPeers(); updateComposer();
+function addMembers(c, ids) {
+  c.members = [...new Set([...c.members, ...ids])];
+  sysNote(c, `You added ${ids.map(contactName).join(", ")}.`);
+  sendGroupInfo(c);
+  save(); render();
 }
 
-function renderPeers() {
-  const ul = $("peers");
-  ul.replaceChildren();
-  if (!peers.size) {
-    const li = document.createElement("li"); li.className = "hint"; li.textContent = "Nobody connected yet.";
-    ul.append(li); return;
+async function deleteMessage(c, m) {
+  const mine = m.from === myId && !m.deleted;
+  const others = c.type === "dm" ? contactName(c.peer) : "the other members";
+  const v = await ask("Delete message?",
+    mine ? `“Delete for everyone” also removes it from ${others}'s chat. If they already read it, they may remember or have copied it.`
+         : "This removes the message from this browser only.",
+    [...(mine ? [["everyone", "Delete for everyone", "danger"]] : []),
+     ["me", "Delete for me", mine ? "" : "danger"], ["cancel", "Cancel"]]);
+  if (v === "me") {
+    c.msgs = c.msgs.filter((x) => x !== m);
+  } else if (v === "everyone") {
+    m.deleted = true; m.text = ""; m.pending = false;
+    S.outbox = S.outbox.filter((o) => !(o.pkt.t === "msg" && o.pkt.id === m.id)); // not sent yet: just don't
+    const pkt = { t: "del", pid: uid(), id: m.id, from: myId };
+    if (c.type === "group") pkt.group = c.id;
+    seen.add(pkt.pid);
+    for (const cid of recipients(c)) deliver(cid, pkt, c.id);
+  } else return;
+  save(); render();
+}
+
+async function deleteChat(c) {
+  const group = c.type === "group";
+  const v = await ask(group ? `Leave “${c.name}”?` : `Delete chat with ${convName(c)}?`,
+    group ? "You'll stop getting messages from this group, and the chat is deleted from this browser. The other members keep their copy."
+          : `All messages with ${convName(c)} are deleted from this browser. They keep their copy. If they write to you again, the chat comes back.`,
+    [["delete", group ? "Leave and delete" : "Delete chat", "danger"], ["cancel", "Cancel"]]);
+  if (v !== "delete") return;
+  S.outbox = S.outbox.filter((o) => o.conv !== c.id); // cancel anything still waiting for this chat
+  if (group) {
+    const pkt = { t: "leave", pid: uid(), group: c.id, from: myId };
+    seen.add(pkt.pid);
+    for (const cid of recipients(c)) deliver(cid, pkt, null);
   }
-  for (const p of peers.values()) {
-    const li = document.createElement("li");
-    const dot = document.createElement("span");
-    dot.className = "dot" + (p.status === "ok" ? " ok" : p.status === "bad" ? " bad" : "");
-    dot.title = p.status === "ok" ? "connected" : p.status === "bad" ? "disconnected" : "waiting";
-    const name = document.createElement("span");
-    name.className = "name"; name.textContent = p.name;
-    const x = document.createElement("button");
-    x.textContent = p.status === "ok" ? "Disconnect" : "Remove";
-    x.onclick = () => removePeer(p);
-    li.append(dot, name, x);
-    ul.append(li);
-  }
+  delete S.convs[c.id];
+  if (current === c.id) { current = null; document.body.classList.remove("show-chat"); }
+  save(); render();
 }
 
-function updateComposer() {
-  const any = [...peers.values()].some((p) => p.status === "ok");
-  $("text").disabled = !any; $("btnSend").disabled = !any;
-  $("text").placeholder = any ? "Type a message…" : "Connect to a peer first";
+// ---------- dialogs ----------
+function ask(title, text, buttons) {
+  const d = $("askDlg");
+  $("askTitle").textContent = title;
+  $("askText").textContent = text;
+  $("askActions").replaceChildren(...buttons.map(([value, label, cls]) => el("button", { value, textContent: label, className: cls || "" })));
+  d.returnValue = "";
+  d.showModal();
+  $("askActions").lastChild.focus(); // the safe choice ("Cancel") gets focus
+  return new Promise((res) => d.addEventListener("close", () => res(d.returnValue), { once: true }));
 }
 
-// Connection wizard in the sidebar
+// Connect dialog: create an invite, or join with one
 const flow = $("flow");
-let pendingInvite = null;
+const connectDlg = $("connectDlg");
+let pendingPeer = null;
 
-function clearFlow() {
+function openConnect() {
   flow.replaceChildren();
-  pendingInvite = null;
+  connectDlg.showModal();
 }
-
-function el(tag, props = {}, ...children) {
-  const e = Object.assign(document.createElement(tag), props);
-  e.append(...children);
-  return e;
-}
+connectDlg.addEventListener("close", () => {
+  if (pendingPeer && pendingPeer.status !== "ok") removePeer(pendingPeer);
+  pendingPeer = null;
+  flow.replaceChildren();
+});
 
 function codeBox(code) {
   const ta = el("textarea", { readOnly: true, rows: 5, value: code });
@@ -422,18 +744,20 @@ function codeBox(code) {
   };
   return [ta, el("div", { className: "row" }, copy)];
 }
+const errorText = (e) => el("div", { className: "error", textContent: e.message || String(e) });
 
-function errorText(e) {
-  return el("div", { className: "hint", style: "color:var(--bad)", textContent: e.message || String(e) });
+function resetPending() {
+  if (pendingPeer && pendingPeer.status !== "ok") removePeer(pendingPeer);
+  pendingPeer = null;
+  flow.replaceChildren();
 }
 
 $("btnInvite").onclick = async () => {
-  if (pendingInvite && pendingInvite.status !== "ok") removePeer(pendingInvite);
-  clearFlow();
+  resetPending();
   flow.append(el("div", { className: "step" }, el("b", { textContent: "Preparing invite…" })));
   try {
     const { peer, code } = await createInvite();
-    pendingInvite = peer;
+    pendingPeer = peer;
     const answer = el("textarea", { rows: 4, placeholder: "Paste the reply code here" });
     const err = el("div");
     const go = el("button", { type: "button", className: "primary", textContent: "Connect" });
@@ -454,21 +778,23 @@ $("btnInvite").onclick = async () => {
 };
 
 $("btnJoin").onclick = () => {
-  if (pendingInvite && pendingInvite.status !== "ok") removePeer(pendingInvite);
-  clearFlow();
+  resetPending();
   const offer = el("textarea", { rows: 4, placeholder: "Paste the invite code here" });
   const err = el("div");
-  const go = el("button", { type: "button", className: "primary", textContent: "Create reply code" });
+  const go = el("button", { type: "button", className: "primary", textContent: "Accept invite" });
   const step = el("div", { className: "step" },
-    el("b", { textContent: "1. Paste the invite code you received" }), offer, err, el("div", { className: "row" }, go));
+    el("b", { textContent: "1. Paste the invite code you received" }), offer,
+    el("div", { className: "hint", textContent: "Next, you'll get a reply code to send back to your friend." }),
+    err, el("div", { className: "row" }, go));
   go.onclick = async () => {
     err.replaceChildren();
     try {
       go.disabled = true;
-      const { code } = await joinWithInvite(offer.value);
+      const { peer, code } = await joinWithInvite(offer.value);
+      pendingPeer = peer;
       step.remove();
       flow.append(el("div", { className: "step" },
-        el("b", { textContent: "2. Send this reply code back" }), ...codeBox(code),
+        el("b", { textContent: "2. Send this reply code back to your friend" }), ...codeBox(code),
         el("div", { className: "hint", textContent: "The chat opens as soon as your friend pastes it." })));
     } catch (e) { err.append(errorText(e)); go.disabled = false; }
   };
@@ -476,28 +802,204 @@ $("btnJoin").onclick = () => {
   offer.focus();
 };
 
-$("composer").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const t = $("text").value;
-  if (!t.trim()) return;
-  sendChat(t);
-  $("text").value = "";
+// Pick-people dialog: new group / add people to a group
+let pickMode = null;
+const pickDlg = $("pickDlg");
+
+function openPick(mode, c) {
+  pickMode = { mode, conv: c };
+  const group = mode === "new";
+  $("pickTitle").textContent = group ? "New group" : `Add people to “${c.name}”`;
+  $("groupNameField").hidden = !group;
+  $("groupName").value = "";
+  $("pickOk").textContent = group ? "Create group" : "Add";
+  const list = Object.entries(S.contacts)
+    .filter(([id]) => id !== myId && (group || !c.members.includes(id)))
+    .sort((a, b) => a[1].name.localeCompare(b[1].name));
+  $("pickHint").textContent = !list.length
+    ? (group ? "You can add people you've connected to before. Connect to someone first." : "Everyone you know is already in this group.")
+    : "Choose from people you've connected to before. Anyone not connected right now is added the next time you connect.";
+  $("pickList").replaceChildren(...list.map(([id, ct]) => el("li", {}, el("label", {},
+    el("input", { type: "checkbox", value: id }),
+    avatar(id, ct.name, false, "small"),
+    el("span", { textContent: ct.name }),
+    el("span", { className: "status", textContent: isOnline(id) ? "Connected" : "" })))));
+  updatePickOk();
+  pickDlg.returnValue = "";
+  pickDlg.showModal();
+}
+function pickedIds() { return [...$("pickList").querySelectorAll("input:checked")].map((i) => i.value); }
+function updatePickOk() { $("pickOk").disabled = pickedIds().length === 0; }
+$("pickList").addEventListener("change", updatePickOk);
+pickDlg.addEventListener("close", () => {
+  if (pickDlg.returnValue !== "ok" || !pickMode) return;
+  const ids = pickedIds();
+  if (!ids.length) return;
+  if (pickMode.mode === "new") {
+    const name = $("groupName").value.trim() || [myName(), ...ids.map(contactName)].join(", ").slice(0, 60);
+    createGroup(name, ids);
+  } else {
+    addMembers(pickMode.conv, ids);
+  }
+  pickMode = null;
 });
 
+// ---------- rendering ----------
+const msgs = $("messages");
+
+function avatar(id, name, online, extra = "") {
+  let h = 0; for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  const a = el("span", { className: "avatar " + extra, textContent: (name.trim()[0] || "?").toUpperCase(), ariaHidden: "true" });
+  a.style.background = `hsl(${h} 45% 42%)`;
+  if (online) a.append(el("span", { className: "online" }));
+  return a;
+}
+
+function preview(c) {
+  for (let i = c.msgs.length - 1; i >= 0; i--) {
+    const m = c.msgs[i];
+    if (m.sys) return m.text;
+    if (m.deleted) return "Message deleted";
+    const who = m.from === myId ? "You: " : c.type === "group" ? contactName(m.from) + ": " : "";
+    return who + m.text;
+  }
+  return c.type === "dm" ? "No messages yet" : "";
+}
+
+function listTime(ts) {
+  const d = new Date(ts);
+  return d.toDateString() === new Date().toDateString() ? fmtTime(ts) : d.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function renderList() {
+  const ul = $("convList");
+  const convs = Object.values(S.convs).sort((a, b) => b.updated - a.updated);
+  if (!convs.length) {
+    ul.replaceChildren(el("li", { className: "hint", textContent: "No chats yet. Connect to someone to start." }));
+    return;
+  }
+  ul.replaceChildren(...convs.map((c) => {
+    const name = convName(c);
+    const online = c.type === "dm" && isOnline(c.peer);
+    const btn = el("button", { type: "button", className: "conv", onclick: () => openConv(c.id) },
+      avatar(c.type === "dm" ? c.peer : c.id, name, online, c.type === "group" ? "group" : ""),
+      el("span", { className: "info" },
+        el("span", { className: "top" },
+          el("span", { className: "name", textContent: name }),
+          el("span", { className: "time", textContent: listTime(c.updated) })),
+        el("span", { className: "preview", textContent: preview(c) })),
+      c.unread ? el("span", { className: "badge", textContent: c.unread > 99 ? "99+" : String(c.unread), ariaLabel: `${c.unread} unread` }) : null);
+    if (c.id === current) btn.setAttribute("aria-current", "true");
+    return el("li", {}, btn);
+  }));
+}
+
+function membersLine(c) {
+  const others = c.members.filter((id) => id !== myId);
+  const online = others.filter(isOnline).length;
+  return ["You", ...others.map(contactName)].join(", ") + (online ? ` · ${online} connected` : " · nobody connected");
+}
+
+function renderMsg(c, m) {
+  if (m.sys) return el("div", { className: "sys", textContent: m.text });
+  const mine = m.from === myId;
+  const meta = (mine ? "You" : contactName(m.from)) + " · " + fmtTime(m.ts) + (m.pending ? " · Not delivered yet" : "");
+  return el("div", { className: "msg" + (mine ? " mine" : "") + (m.deleted ? " deleted" : "") },
+    el("div", { className: "meta" },
+      el("span", { textContent: meta }),
+      el("button", { type: "button", className: "msg-del", textContent: "Delete", ariaLabel: "Delete message", onclick: () => deleteMessage(c, m) })),
+    el("div", { className: "body", textContent: m.deleted ? "This message was deleted." : m.text }));
+}
+
+function renderChat() {
+  const c = current && S.convs[current];
+  $("welcome").hidden = !!c;
+  $("chatView").hidden = !c;
+  if (!c) return;
+
+  $("chatTitle").textContent = convName(c);
+  const actions = [];
+  if (c.type === "dm") {
+    const on = isOnline(c.peer);
+    $("chatSub").textContent = on ? "Connected" : "Not connected. Your messages are sent when you reconnect.";
+    if (!on) actions.push(el("button", { type: "button", textContent: "Reconnect", onclick: openConnect }));
+    $("text").placeholder = on ? "Type a message…" : `Message (sent when ${convName(c)} is connected)`;
+  } else {
+    $("chatSub").textContent = membersLine(c);
+    actions.push(el("button", { type: "button", textContent: "Add people", onclick: () => openPick("add", c) }));
+    $("text").placeholder = "Message the group…";
+  }
+  actions.push(el("button", { type: "button", textContent: c.type === "group" ? "Leave group" : "Delete chat", onclick: () => deleteChat(c) }));
+  $("chatActions").replaceChildren(...actions);
+
+  const switched = msgs.dataset.conv !== c.id;
+  const atBottom = switched || msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40;
+  msgs.dataset.conv = c.id;
+  const nodes = [];
+  if (!c.msgs.length) {
+    nodes.push(el("div", { className: "sys", textContent: c.type === "dm" ? `This is the start of your chat with ${convName(c)}.` : "No messages yet." }));
+  }
+  let lastDay = null;
+  for (const m of c.msgs) {
+    const d = new Date(m.ts);
+    const day = d.toDateString();
+    if (day !== lastDay) {
+      lastDay = day;
+      nodes.push(el("div", { className: "sys day", textContent: day === new Date().toDateString() ? "Today"
+        : d.toLocaleDateString([], { weekday: "short", year: "numeric", month: "short", day: "numeric" }) }));
+    }
+    nodes.push(renderMsg(c, m));
+  }
+  msgs.replaceChildren(...nodes);
+  if (atBottom) msgs.scrollTop = msgs.scrollHeight;
+}
+
+function render() {
+  renderList();
+  renderChat();
+  const unread = Object.values(S.convs).reduce((n, c) => n + (c.unread || 0), 0);
+  document.title = unread ? `(${unread}) P2P Chat` : "P2P Chat";
+}
+
+function openConv(id) {
+  const c = S.convs[id];
+  if (!c) return;
+  current = id;
+  c.unread = 0;
+  document.body.classList.add("show-chat");
+  save(); render();
+  if (matchMedia("(min-width: 761px)").matches) $("text").focus();
+}
+
+// ---------- wiring ----------
+$("btnConnect").onclick = openConnect;
+$("btnWelcomeConnect").onclick = openConnect;
+$("btnNewGroup").onclick = () => openPick("new");
+$("btnBack").onclick = () => { current = null; document.body.classList.remove("show-chat"); render(); };
+$("composer").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const c = current && S.convs[current];
+  const t = $("text").value;
+  if (!c || !t.trim()) return;
+  sendText(c, t);
+  $("text").value = "";
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !current || !S.convs[current]) return;
+  S.convs[current].unread = 0; save(); render();
+});
 window.addEventListener("beforeunload", () => { for (const p of peers.values()) try { p.pc.close(); } catch {} });
 
 // ---------- version & auto-update ----------
 // version.json is fetched bypassing every cache. If it names a different
 // version, the page refreshes its own cached copy and reloads — but only while
-// idle, because reloading drops all chat connections and pending invites.
+// idle, because reloading drops all connections. Chats are saved, so nothing is lost.
 $("ver").textContent = "v" + APP_VERSION;
 
 const UPDATE_CHECK_MS = 5 * 60 * 1000;
 let latestVersion = null;
 
-function isIdle() {
-  return ![...peers.values()].some((p) => p.status !== "bad") && !flow.hasChildNodes();
-}
+const isIdle = () => peers.size === 0 && !document.querySelector("dialog[open]");
 
 async function applyUpdate() {
   try { sessionStorage.setItem("p2pchat.reloadedFor", latestVersion); } catch {}
@@ -507,7 +1009,7 @@ async function applyUpdate() {
 }
 
 async function checkForUpdate() {
-  if (location.protocol === "file:") return; // opened from disk: nothing to compare against
+  if (location.protocol === "file:" || !active) return; // opened from disk: nothing to compare against
   let remote;
   try {
     const res = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
@@ -523,7 +1025,7 @@ async function checkForUpdate() {
   try { alreadyTried = sessionStorage.getItem("p2pchat.reloadedFor") === remote; } catch {}
 
   if (isIdle() && !alreadyTried) return applyUpdate();
-  $("updateText").textContent = `Version ${remote} is available. Reloading ends your current chats.`;
+  $("updateText").textContent = `Version ${remote} is available. Reloading ends your current connections; your chats are kept.`;
   $("update").hidden = false;
 }
 
@@ -532,7 +1034,7 @@ checkForUpdate();
 setInterval(checkForUpdate, UPDATE_CHECK_MS);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
 
-updateComposer();
+render();
 </script>
 </body>
 </html>
