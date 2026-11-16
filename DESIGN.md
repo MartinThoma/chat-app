@@ -29,6 +29,7 @@ All colors are CSS variables on `:root`. Dark mode follows the operating system 
 | `--ok` | `#1f9d55` | `#3cbf74` | "Connected" dot |
 | `--bad` | `#c93636` | `#f07a7a` | Error text |
 | `--danger` | `#c93636` | `#c93636` | Destructive buttons (white text) |
+| `--shadow` | soft, 8% | soft, 35% | Onboarding card |
 
 Text meets WCAG AA contrast (4.5:1) against its background in both themes.
 
@@ -37,11 +38,12 @@ Text meets WCAG AA contrast (4.5:1) against its background in both themes.
 ## Typography
 
 - **Font:** `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`, so the app looks native on every platform. Connection codes use `ui-monospace`.
-- **Scale:** three sizes only, each step at least 1.33× the previous one, and the largest exactly twice the smallest.
+- **Scale:** three sizes in the app, each step at least 1.33× the previous one, with the largest exactly twice the smallest. A fourth, display size is used only for the onboarding headline on wide screens.
 
 | Size | Used for |
 |---|---|
-| 24px / 600 | App title, welcome heading |
+| 48px / 600 | Onboarding headline (desktop only; 24px on phones), line height 1.08 |
+| 24px / 600 | App title, welcome heading, onboarding step titles, security number |
 | 16px / 400 and 600 | Body, messages, buttons, inputs, chat names, chat and dialog titles |
 | 12px | Hints, timestamps, previews, message details, system lines, badges, connection codes |
 
@@ -52,7 +54,7 @@ Text meets WCAG AA contrast (4.5:1) against its background in both themes.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ P2P Chat v1.1.0                       Your name [Alice]  │  top bar
+│ P2P Chat v1.2.0                       Your name [Alice]  │  top bar
 ├────────────────────┬─────────────────────────────────────┤
 │ [Connect] [New grp]│ Trip                [Add] [Leave]   │  chat header
 │ ● Trip      13:46  │ You, Bob · 1 connected              │
@@ -71,6 +73,31 @@ Text meets WCAG AA contrast (4.5:1) against its background in both themes.
 - **Desktop (wider than 760px):** a sidebar of fixed width 320px next to the chat. Only the chat list and the message list scroll.
 - **Phone (760px and narrower):** one panel at a time. The chat list is the home screen. Opening a chat replaces it, and **←** goes back. Message bubbles may use 88% of the width instead of 75%.
 - **Side spacing** is 16px everywhere (top bar, sidebar sections, chat header, messages, composer).
+- **Sidebar footer:** the collapsible sections **Account** (backup, restore, account ID) and **Network settings** sit below the chat list.
+
+### Onboarding screen
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ P2P Chat                                                 │
+│                                  ┌────────────────────┐  │
+│ Chat directly.                   │ Step 1 of 2        │  │
+│ No server.                       │ Create your account│  │
+│ No sign-up.            (48px)    │ Your name [      ] │  │
+│ Messages go straight from …      │ [ Create account ] │  │
+│                                  │ ─────── or ─────── │  │
+│ ① Your account lives on …        │ [Restore a backup] │  │
+│ ② Connect by swapping a code …   └────────────────────┘  │
+│ ③ Chat while you're both online …                        │
+└──────────────────────────────────────────────────────────┘
+```
+
+- A full-screen page shown on the first visit, in place of the app. It's a two-column grid at most 1040px wide, vertically centered: on the left the intro and "how it works", on the right the setup card.
+- **Phones (860px and narrower):** one column in the order intro, setup card, how it works, so the form appears early. The headline drops to 24px.
+- **The headline** is set on three fixed lines. "sign-up" uses a non-breaking hyphen, so it never splits.
+- **"How it works" items** are numbered with 32px circles (`--selected` fill), a bold title and muted text.
+- **The setup card** is a panel with a 14px radius, a soft shadow and 28px padding. It has a small "Step 1 of 2" label, a 24px title, a muted explanation, and full-width buttons with one primary action. "Skip for now" and "Back" are text links, so they don't compete with it.
+- **The "Backup saved" confirmation** uses a green check circle next to the title.
 
 ## Shape and spacing
 
@@ -79,7 +106,7 @@ Text meets WCAG AA contrast (4.5:1) against its background in both themes.
 | Buttons, inputs, code boxes | 8px |
 | Chat list rows, connection steps | 10px |
 | Group avatars | 12px (rounded square, so groups and people look different) |
-| Message bubbles, dialogs | 14px |
+| Message bubbles, dialogs, onboarding card | 14px |
 | People's avatars, online dot, badges | round |
 
 Spacing steps are 4, 6, 8, 10, 12 and 16px. Gaps between related controls are 8px.
@@ -105,7 +132,13 @@ Disabled buttons are shown at 50% opacity.
 
 **Update banner.** A full-width accent strip under the top bar: "Version x is available…" with **Reload now**.
 
-**Second-tab overlay.** Covers the whole page: "P2P Chat is open in another tab" with **Use here**.
+**Full-page notices.** Centered 24px title with muted text, covering the whole page:
+- "P2P Chat is open in another tab", with **Use here**.
+- "Open P2P Chat over a secure connection", shown when the browser blocks cryptography, for example on plain HTTP from another device.
+
+**Security number dialog.** Six groups of five digits in a 3×2 grid, set in a 24px semibold monospace font so they're easy to read aloud. Above them, a short explanation of how to compare. The primary button reads "They match, mark as verified". Verified contacts show "Verified ✓" in the chat header and on the button.
+
+**Password fields.** Backups use two password fields ("Backup password", "Repeat password") with the browser's `new-password` autocomplete, so password managers offer to store them. Errors appear in red 12px text right above the button.
 
 ## Voice and copy
 

@@ -6,10 +6,45 @@ P2P Chat is a messenger that runs entirely in the browser and needs no server. P
 
 - **No server in the chat path.** Messages go from browser to browser over WebRTC data channels, encrypted with DTLS. Nothing is uploaded or stored centrally.
 - **Data stays on the device.** Name, contacts and chat history live in the browser's local storage, and nowhere else.
+- **An account is a key pair.** No email, phone number or password. Your identity is a cryptographic key created in your browser, and everything you send is signed with it.
 - **One file, no build step.** No libraries, no framework, no install. Anyone can read, host or fork it.
 - **Honest about limits.** Without a server some things can't work, such as reaching someone whose browser is closed. The app says so instead of pretending.
 
 ## Features
+
+### Onboarding
+
+The first visit shows a welcome screen instead of the app:
+
+- **Left side:** what the app is ("Chat directly. No server. No sign-up.") and how it works in three steps: your account lives on this device, you connect by swapping a code, you chat while you're both online.
+- **Right side:** the account setup.
+  1. **Create your account:** enter a name, then **Create account**. The key pair is created at this moment.
+  2. **Back up your account:** set a password and **Download backup**, or **Skip for now**. A confirmation screen follows, then **Start chatting**.
+- **Restore from a backup** is offered on the first step, for people who already have an account.
+
+On phones the order is intro, then setup, then how it works, so the setup form is visible without scrolling far.
+
+### Account and identity
+
+- On **Create account**, the browser creates an ECDSA P-256 key pair. Every current browser supports this algorithm.
+- Your **account ID** is derived from the public key: the first 18 bytes of its SHA-256 hash. Nobody can use your ID without your private key.
+- On every connection, both sides prove their identity. Each signs the certificate fingerprints of both ends of that exact encrypted connection. A captured proof is useless on any other connection.
+- Every message, deletion, group change and "leave" is signed by its author. Recipients check the signature, including for group messages that other members passed on. A member who passes messages on can't change them or pretend to be someone else.
+- The account lives in local storage: key, name, contacts and chats. Opening the app again skips onboarding.
+- Browsers only allow this cryptography over `https://`, on `localhost`, and for files opened from disk. Opened over plain HTTP from another address, the app explains this instead of starting.
+
+### Backup and restore
+
+- **Back up account** creates one file, `p2pchat-backup-<name>-<date>.json`. It contains the private key, name, contacts, chats and messages waiting to be sent. You can make one during onboarding, or later under **Account** in the sidebar.
+- The file is encrypted with AES-GCM. The key is derived from your password with PBKDF2-SHA-256, 600,000 iterations. Passwords need at least 8 characters, and nobody can recover a forgotten one.
+- **Restore** is offered during onboarding and under **Account**. It asks for the file and password, checks that the private key matches the public key, then replaces the account and chats in this browser. A wrong password gives "Wrong password, or the file is damaged."
+- Use the backup to move to another device, or to recover after clearing browser data.
+
+### Verifying contacts
+
+- Every personal chat has **Verify**. It shows a 30-digit security number computed from both account IDs, so both people see the same number.
+- Comparing it in person or on a call proves that nobody tampered with the codes you swapped. **They match, mark as verified** marks the contact as "Verified ✓".
+- If a new contact connects with the same name as an existing one, the chat shows a note. That person may have created a new account, and "Verify" settles it.
 
 ### Connecting to someone
 
@@ -21,11 +56,11 @@ Browsers can't open a connection to a bare IP address. Two people instead swap a
 
 Each code works only once. Mistakes give clear errors, for example "That's an invite code, not a reply code".
 
-### Identity and contacts
+### Contacts
 
-- Each browser creates a random, permanent user ID on first start. Everyone who connects is recognized by it, so reconnecting with new codes later continues the same chat.
+- Everyone you've connected to becomes a **contact**, recognized by their account ID. Reconnecting later with new codes continues the same chat.
 - **Your name** sits in the top bar and can be changed at any time. Connected people see the change right away. Others see it when they next connect, together with a note in the chat ("Bob is now called Robert.").
-- Everyone you've connected to becomes a **contact**. You can add contacts to groups even while they're not connected.
+- You can add contacts to groups even while they're not connected.
 
 ### Personal chats
 
@@ -77,7 +112,7 @@ Only one tab can be connected and saving at a time. Opening the app in a second 
 
 - **STUN server**, `stun:stun.l.google.com:19302` by default. It only tells your browser its public IP so people can connect across the internet. No messages pass through it. Leave it empty for local-network or fully offline use.
 - **Your IP address**: browsers hide local IPs behind random `….local` names, which some networks can't resolve. If connecting on the same network fails, entering your LAN IP puts it into your codes instead.
-- `make run` starts a local server and prints your LAN IP.
+- `make run` starts a local HTTPS server with a self-signed certificate and prints your LAN IP. Browsers warn about the certificate once.
 
 ## Limits and non-goals
 
@@ -88,21 +123,27 @@ Only one tab can be connected and saving at a time. Opening the app in a second 
 - **Group delivery is best effort.** Members who are offline get missed group messages only when they next connect directly to the sender. Messages passed on by other members are not stored for later.
 - **Group members can't be removed** by others. People can only leave.
 - **"Delete for everyone" is a request.** It works with this app, but nobody can prevent a recipient from having read, copied or screenshotted a message.
-- **Trust within groups.** Connections are encrypted, but messages are not signed, so a group member who passes messages on could change them or fake their sender. Groups are meant for people who trust each other.
-- **Local storage is not encrypted.** Anyone with access to the browser profile can read the history.
+- **Group members can read what they pass on.** Messages are encrypted per connection, not end to end per message. Every member can read group messages, which is intended, and a member who passes messages on could also hold them back.
+- **The first code exchange is trusted.** If someone tampered with the codes on their way, only comparing security numbers ("Verify") reveals it.
+- **Local storage is not encrypted.** Anyone with access to the browser profile can read the history and use the account key.
+- **Losing the key means a new account.** Without a backup, clearing browser data creates a new identity, and contacts see you as a new person.
+- **One device at a time.** A restored backup is the same account. Using it on two devices at once works, but each device keeps its own history.
+- **No upgrade path from 1.1.** Version 1.2 introduced key-based accounts. Chats from 1.1 stay in the browser's storage, but the app doesn't show them, and 1.1 and 1.2 can't connect to each other.
 - **Not included:** files and images, voice and video, reactions, editing, read receipts, typing indicators, push notifications.
 
 ## Protocol (for developers)
 
-All packets are JSON sent over a single WebRTC data channel per connection.
+All packets are JSON sent over a single WebRTC data channel per connection. The protocol version is `proto: 2`. Peers with another version are refused, with the message "uses a different version".
 
 | Packet | Fields | Purpose |
 |---|---|---|
-| `hello` | `id`, `name`, `v` | Sent first on every connection: user ID, name, app version |
-| `msg` | `pid`, `id`, `from`, `name`, `text`, `ts`, `group?` | A chat message. `group` set means a group message, otherwise a personal message. |
-| `del` | `pid`, `id`, `from`, `group?` | Delete for everyone. Only honored if `from` wrote message `id`. |
-| `group` | `pid`, `group`, `gname`, `from`, `members[{id,name}]` | Create a group or add members |
-| `leave` | `pid`, `group`, `from` | A member left |
-| `ack` | `pid` | Confirms receipt. The sender removes the packet from its outbox. |
+| `hello` | `proto`, `v`, `id`, `pub`, `name`, `sig` | Sent first on every connection. `sig` signs `p2pchat-hello\n<own fingerprint>\n<other's fingerprint>`, using the DTLS fingerprints of this connection. `id` must equal the hash of `pub`. |
+| `msg` | `pid`, `id`, `from`, `name`, `text`, `ts`, `group?`, `sig` | A chat message. `group` set means a group message, otherwise a personal message. |
+| `del` | `pid`, `id`, `from`, `group?`, `sig` | Delete for everyone. Only honored if `from` wrote message `id`. |
+| `group` | `pid`, `group`, `gname`, `from`, `members[{id,name,pub}]`, `sig` | Create a group or add members. Only accepted from an existing member. |
+| `leave` | `pid`, `group`, `from`, `sig` | A member left |
+| `ack` | `pid` | Confirms receipt. The sender removes the packet from its outbox. Not signed, because it only travels over the connection the identity was proven on. |
 
-Group packets (`group` set) are passed on to connected members, with duplicates dropped by `pid`. Personal packets are accepted only directly from their author.
+- **Signatures:** ECDSA P-256 with SHA-256, over `p2pchat-packet\n` followed by the packet without `sig`, serialized as JSON with sorted keys and no `undefined` fields. Keys and signatures are base64url.
+- **Passing on:** group packets (`group` set) are passed on to connected members, and duplicates are dropped by `pid`. Personal packets are accepted only directly from their author.
+- **Security number:** the SHA-256 hash of `p2pchat-safety\n<id1>\n<id2>`, with the IDs sorted. The first 24 bytes are read as six 32-bit numbers, each taken modulo 100000.

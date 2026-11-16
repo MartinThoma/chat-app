@@ -3,7 +3,7 @@ PORT ?= 8000
 .PHONY: help run bump check-version
 
 help:
-	@echo "make run                  Start a local web server (PORT=$(PORT)) and show your local IP"
+	@echo "make run                  Start a local HTTPS server (PORT=$(PORT)) and show your local IP"
 	@echo "make bump VERSION=x.y.z   Set the app version in index.html and version.json"
 	@echo "make check-version        Check that index.html and version.json agree"
 

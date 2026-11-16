@@ -11,6 +11,7 @@
     --mine: #2f6fed; --mine-text: #fff; --theirs: #eceff4; --theirs-text: #1d2330;
     --hover: #eef1f6; --selected: #e3e9f6;
     --ok: #1f9d55; --bad: #c93636; --danger: #c93636; --danger-text: #fff;
+    --shadow: 0 8px 28px rgb(20 30 60 / .08);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -19,6 +20,7 @@
       --mine: #3d6fe0; --mine-text: #fff; --theirs: #262b35; --theirs-text: #e4e7ee;
       --hover: #222731; --selected: #29303d;
       --ok: #3cbf74; --bad: #f07a7a;
+      --shadow: 0 8px 28px rgb(0 0 0 / .35);
     }
   }
   * { box-sizing: border-box; }
@@ -29,10 +31,11 @@
     font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     display: flex; flex-direction: column;
   }
-  input[type=text], textarea {
+  input[type=text], input[type=password], textarea {
     font: inherit; color: var(--text); background: var(--bg);
     border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
   }
+  input[type=file] { font: inherit; color: var(--text); max-width: 100%; }
   textarea { width: 100%; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
   button {
     font: inherit; cursor: pointer; border: 1px solid var(--border); border-radius: 8px;
@@ -40,9 +43,14 @@
   }
   button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
   button.danger { background: var(--danger); color: var(--danger-text); border-color: var(--danger); }
+  button.link { border: 0; background: none; padding: 4px 0; color: var(--text); text-decoration: underline; }
   button:disabled { opacity: .5; cursor: default; }
+  a { color: inherit; }
   .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .error { color: var(--bad); font-size: 12px; }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
   /* top bar */
   #topbar {
@@ -96,9 +104,9 @@
     position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%;
     background: var(--ok); border: 2px solid var(--panel);
   }
-  #settings { border-top: 1px solid var(--border); padding: 10px 16px; }
-  #settings summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-  #settings .inner { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .side-section { border-top: 1px solid var(--border); padding: 10px 16px; }
+  .side-section summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  .side-section .inner { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
 
   /* chat */
   #chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -129,7 +137,7 @@
   }
   .msg:hover .msg-del, .msg:focus-within .msg-del { opacity: 1; }
   @media (hover: none) { .msg-del { opacity: 1; } }
-  .sys { align-self: center; color: var(--muted); font-size: 12px; text-align: center; }
+  .sys { align-self: center; color: var(--muted); font-size: 12px; text-align: center; max-width: 520px; }
   .sys.day { font-weight: 600; margin-top: 8px; }
   #composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--panel); }
   #composer input { flex: 1; min-width: 0; }
@@ -143,21 +151,60 @@
   dialog::backdrop { background: rgb(0 0 0 / .45); }
   dialog h2 { font-size: 16px; margin: 0 0 8px; }
   dialog p { margin: 0 0 8px; }
-  dialog .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 16px; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 16px; }
   .dlg-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .dlg-head h2 { flex: 1; margin: 0; }
   .step { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
   .step b { font-size: 16px; }
-  .error { color: var(--bad); font-size: 12px; }
-  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-size: 12px; color: var(--muted); }
   .picklist { list-style: none; padding: 0; margin: 4px 0 0; max-height: 260px; overflow-y: auto; }
   .picklist label { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-radius: 8px; cursor: pointer; }
   .picklist label:hover { background: var(--hover); }
   .picklist .status { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .safety { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; gap: 8px 20px; margin: 16px 0; font: 600 24px/1.2 ui-monospace, monospace; }
 
-  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  #inactive { position: fixed; inset: 0; z-index: 10; background: var(--bg); display: grid; place-items: center; padding: 16px; text-align: center; }
+  /* full-screen pages: onboarding, insecure, second tab */
+  .screen { position: fixed; inset: 0; z-index: 20; overflow-y: auto; background: var(--bg); }
+  .ob-wrap {
+    min-height: 100%; max-width: 1040px; margin: 0 auto; padding: 48px 24px;
+    display: grid; grid-template-columns: 1.15fr 1fr; column-gap: 56px; align-content: center;
+    grid-template-areas: "intro card" "how card";
+  }
+  .ob-intro { grid-area: intro; align-self: end; }
+  .ob-how-wrap { grid-area: how; align-self: start; }
+  .ob-card { grid-area: card; align-self: center; }
+  .ob-brand { font-weight: 600; margin: 0 0 16px; }
+  .ob-intro h1 { font-size: 48px; line-height: 1.08; margin: 0 0 16px; letter-spacing: -0.01em; }
+  .ob-lead { color: var(--muted); margin: 0 0 32px; max-width: 46ch; }
+  .ob-how { list-style: none; counter-reset: how; padding: 0; margin: 0; display: grid; gap: 20px; }
+  .ob-how li { counter-increment: how; display: grid; grid-template-columns: 32px 1fr; gap: 14px; }
+  .ob-how li::before {
+    content: counter(how); width: 32px; height: 32px; border-radius: 50%;
+    background: var(--selected); color: var(--text); font-weight: 600; display: grid; place-items: center;
+  }
+  .ob-how b { display: block; }
+  .ob-how span { color: var(--muted); }
+  .ob-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 28px; box-shadow: var(--shadow); }
+  .ob-card h2 { font-size: 24px; margin: 0 0 8px; }
+  .ob-card p { margin: 0 0 16px; color: var(--muted); }
+  .ob-card .step-label { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 6px; }
+  .ob-card .field input { font-size: 16px; }
+  .ob-card .actions { justify-content: stretch; flex-direction: column; }
+  .ob-card .actions button { width: 100%; padding: 10px 14px; }
+  .or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; margin: 20px 0; }
+  .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+  .ob-ok { display: flex; align-items: center; gap: 10px; }
+  .ob-ok::before { content: "✓"; width: 32px; height: 32px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
+  .center-msg { min-height: 100%; display: grid; place-items: center; padding: 24px 16px; text-align: center; }
+  .center-msg > div { max-width: 480px; }
+  .center-msg h2 { font-size: 24px; margin: 0 0 8px; }
+  .center-msg p { color: var(--muted); }
 
+  @media (max-width: 860px) {
+    .ob-wrap { grid-template-columns: 1fr; grid-template-areas: "intro" "card" "how"; padding: 32px 16px; row-gap: 24px; }
+    .ob-intro h1 { font-size: 24px; }
+    .ob-lead { margin-bottom: 0; }
+    .ob-card { padding: 20px; }
+  }
   @media (max-width: 760px) {
     #sidebar { width: 100%; border-right: 0; }
     #chat { display: none; }
@@ -188,10 +235,20 @@
       <button type="button" id="btnNewGroup">New group</button>
     </div>
     <ul id="convList" aria-label="Chats"></ul>
-    <details id="settings">
+    <details class="side-section" id="account">
+      <summary>Account</summary>
+      <div class="inner">
+        <p class="hint" id="accountInfo"></p>
+        <div class="row">
+          <button type="button" id="btnBackup">Back up account</button>
+          <button type="button" id="btnRestore">Restore from backup</button>
+        </div>
+      </div>
+    </details>
+    <details class="side-section" id="settings">
       <summary>Network settings</summary>
       <div class="inner">
-        <label class="hint" for="stun">STUN server (only used to find out your public IP so you can connect across the internet. No messages pass through it. Leave empty for LAN-only / fully offline.)</label>
+        <label class="hint" for="stun">STUN server (only used to find out your public IP so you can connect across the internet; messages never pass through it. Leave empty for LAN-only / fully offline.)</label>
         <input type="text" id="stun" placeholder="stun:stun.l.google.com:19302">
         <label class="hint" for="myip">Your IP address (optional). Browsers hide your local IP behind a random “….local” name. If connecting on the same network fails, enter your LAN IP here (e.g. 192.168.1.23) and create a new code.</label>
         <input type="text" id="myip" placeholder="e.g. 192.168.1.23">
@@ -228,7 +285,7 @@
     <h2 id="connectTitle">Connect to someone</h2>
     <form method="dialog"><button aria-label="Close">✕</button></form>
   </div>
-  <p class="hint">One person creates an invite and sends the code to the other (any messenger, email, …). The other person accepts it and sends a reply code back. No server is involved in the chat itself.</p>
+  <p class="hint">One person creates an invite and sends the code to the other (any messenger, email, …). The other person accepts it and sends a reply code back. The chat itself never goes through a server.</p>
   <div class="row">
     <button type="button" class="primary" id="btnInvite">Create invite</button>
     <button type="button" id="btnJoin">Join with invite</button>
@@ -259,21 +316,57 @@
   </form>
 </dialog>
 
+<dialog id="formDlg" aria-labelledby="formTitle">
+  <div class="dlg-head">
+    <h2 id="formTitle"></h2>
+    <form method="dialog"><button aria-label="Close">✕</button></form>
+  </div>
+  <div id="formBody"></div>
+</dialog>
+
 <!-- Screen readers hear new incoming messages here (the message list itself is redrawn on every change). -->
 <div id="announcer" class="sr-only" aria-live="polite"></div>
 
-<div id="inactive" hidden>
-  <div>
-    <p>P2P Chat is open in another tab.<br>Only one tab can be connected at a time.</p>
-    <button type="button" class="primary" onclick="location.reload()">Use here</button>
+<div id="onboarding" class="screen" hidden>
+  <div class="ob-wrap">
+    <section class="ob-intro">
+      <p class="ob-brand">P2P Chat</p>
+      <h1>Chat directly.<br>No server.<br>No&nbsp;sign&#8209;up.</h1>
+      <p class="ob-lead">Messages go straight from your browser to your friends' browsers, encrypted, so there's nobody in between who could store or read them.</p>
+    </section>
+    <section class="ob-card" id="obCard" aria-live="polite"></section>
+    <section class="ob-how-wrap" aria-label="How it works">
+      <ol class="ob-how">
+        <li><div><b>Your account lives on this device.</b><span>It's a key pair created right here in your browser, without an email address or phone number.</span></div></li>
+        <li><div><b>Connect by swapping a code.</b><span>Send an invite code through any messenger. Your friend sends a reply code back. Once per person is enough.</span></div></li>
+        <li><div><b>Chat while you're both online.</b><span>Messages travel directly between you. Anything written while someone is away is sent when you're both online again.</span></div></li>
+      </ol>
+    </section>
   </div>
+</div>
+
+<div id="insecure" class="screen" hidden>
+  <div class="center-msg"><div>
+    <h2>Open P2P Chat over a secure connection</h2>
+    <p>Your account uses your browser's built-in cryptography, which browsers only allow on <b>https://</b> addresses, on <b>localhost</b> and for files opened from disk.</p>
+    <p>Use <a href="https://martin-thoma.com/chat-app/">martin-thoma.com/chat-app</a>, open <code>index.html</code> directly, or run <code>make run</code>, which serves the app over HTTPS.</p>
+  </div></div>
+</div>
+
+<div id="inactive" class="screen" hidden>
+  <div class="center-msg"><div>
+    <h2>P2P Chat is open in another tab</h2>
+    <p>Only one tab can be connected at a time.</p>
+    <button type="button" class="primary" onclick="location.reload()">Use here</button>
+  </div></div>
 </div>
 
 <script>
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
+const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
 const $ = (id) => document.getElementById(id);
@@ -289,19 +382,97 @@ function el(tag, props = {}, ...children) {
   return e;
 }
 const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function b64u(buf) {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function unb64u(str) {
+  let s = String(str).replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+const utf8 = (s) => new TextEncoder().encode(s);
+function download(name, text) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const a = el("a", { href: url, download: name });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function field(label, input) { return el("label", { className: "field" }, label, input); }
 
-// ---------- identity & settings ----------
-// A random id that stays the same in this browser, so people are recognized when they reconnect.
-let myId = store.get("p2pchat.id", "");
-if (!myId) { myId = uid(); store.set("p2pchat.id", myId); }
+// ---------- identity: an ECDSA P-256 key pair created on first use ----------
+// Your account ID is a hash of your public key, so nobody can claim it without the
+// private key. Every connection and every message you write is signed with it.
+const ALG = { name: "ECDSA", namedCurve: "P-256" };
+const SIG = { name: "ECDSA", hash: "SHA-256" };
+const IDENTITY_KEY = "p2pchat.v2.identity"; // { pub: base64url raw public key, privJwk }
+let me = null;                              // { id, pub, priv: CryptoKey, privJwk }
 
+const idCache = new Map();
+async function idFromPub(pub) {
+  if (!idCache.has(pub)) {
+    const h = new Uint8Array(await crypto.subtle.digest("SHA-256", unb64u(pub)));
+    idCache.set(pub, b64u(h.slice(0, 18)));
+  }
+  return idCache.get(pub);
+}
+async function createIdentity() {
+  const kp = await crypto.subtle.generateKey(ALG, true, ["sign", "verify"]);
+  return {
+    pub: b64u(await crypto.subtle.exportKey("raw", kp.publicKey)),
+    privJwk: await crypto.subtle.exportKey("jwk", kp.privateKey),
+  };
+}
+async function openIdentity(rec) {
+  const priv = await crypto.subtle.importKey("jwk", rec.privJwk, ALG, false, ["sign"]);
+  return { id: await idFromPub(rec.pub), pub: rec.pub, priv, privJwk: rec.privJwk };
+}
+function loadIdentityRecord() {
+  try { const r = JSON.parse(localStorage.getItem(IDENTITY_KEY)); return r && r.pub && r.privJwk ? r : null; } catch { return null; }
+}
+const keyCache = new Map();
+async function verify(pub, sig, text) {
+  try {
+    if (!keyCache.has(pub)) keyCache.set(pub, await crypto.subtle.importKey("raw", unb64u(pub), ALG, false, ["verify"]));
+    return await crypto.subtle.verify(SIG, keyCache.get(pub), unb64u(sig), utf8(text));
+  } catch { return false; }
+}
+async function sign(text) { return b64u(await crypto.subtle.sign(SIG, me.priv, utf8(text))); }
+// Deterministic serialization, so sender and receiver sign/verify the same bytes.
+function canonical(v) {
+  if (Array.isArray(v)) return "[" + v.map(canonical).join(",") + "]";
+  if (v && typeof v === "object") {
+    return "{" + Object.keys(v).filter((k) => v[k] !== undefined).sort()
+      .map((k) => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}";
+  }
+  return JSON.stringify(v);
+}
+function signedPart(p) { const { sig, ...rest } = p; return "p2pchat-packet\n" + canonical(rest); }
+async function signPkt(p) { p.sig = await sign(signedPart(p)); return p; }
+const verifyPkt = (p, pub) => (pub && typeof p.sig === "string" ? verify(pub, p.sig, signedPart(p)) : false);
+
+// A number both people see identically. Comparing it in person rules out tampering.
+async function safetyNumber(otherId) {
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", utf8("p2pchat-safety\n" + [me.id, otherId].sort().join("\n"))));
+  const groups = [];
+  for (let i = 0; i < 6; i++) {
+    const n = ((h[i * 4] << 24) | (h[i * 4 + 1] << 16) | (h[i * 4 + 2] << 8) | h[i * 4 + 3]) >>> 0;
+    groups.push(String(n % 100000).padStart(5, "0"));
+  }
+  return groups;
+}
+
+// ---------- settings ----------
 const nickEl = $("nick");
-nickEl.value = store.get("p2pchat.nick", "Guest-" + Math.floor(Math.random() * 1000));
+nickEl.value = store.get("p2pchat.nick", "");
 const myName = () => nickEl.value.trim() || "Guest";
-nickEl.addEventListener("change", () => {
+nickEl.addEventListener("change", async () => {
   nickEl.value = myName();
   store.set("p2pchat.nick", nickEl.value);
-  for (const p of okPeers()) sendPeer(p, helloPkt());
+  for (const p of okPeers()) sendPeer(p, await helloPkt(p));
+  renderAccount();
 });
 const stunEl = $("stun");
 stunEl.value = store.get("p2pchat.stun", "stun:stun.l.google.com:19302");
@@ -311,10 +482,10 @@ ipEl.value = store.get("p2pchat.myip", "");
 ipEl.addEventListener("change", () => store.set("p2pchat.myip", ipEl.value.trim()));
 
 // ---------- saved state (this browser's localStorage only) ----------
-// contacts: { [userId]: { name, lastSeen } }
+// contacts: { [userId]: { name, pub, lastSeen, verified } }
 // convs:    { [convId]: { id, type: "dm"|"group", peer?, name?, members?, msgs: [], unread, updated } }
-// outbox:   [{ to: userId, pkt, conv, ts }]  packets waiting for that person to connect
-const STATE_KEY = "p2pchat.state";
+// outbox:   [{ to: userId, pkt, conv, ts }]  signed packets waiting for that person's ack
+const STATE_KEY = "p2pchat.v2.state";
 const MAX_MSGS = 1000;                          // per chat
 const OUTBOX_TTL = 30 * 24 * 3600 * 1000;       // undelivered packets are dropped after 30 days
 
@@ -326,7 +497,7 @@ function loadState() {
   return { contacts: {}, convs: {}, outbox: [] };
 }
 const S = loadState();
-let active = true;        // false once another tab took over
+let active = true;        // false once another tab took over (or while restoring a backup)
 let saveQueued = false;
 
 function save() {
@@ -365,11 +536,157 @@ function deactivate() {
   $("inactive").hidden = false;
 }
 
+// ---------- backup & restore: a password-encrypted file ----------
+const KDF_ITERATIONS = 600000;
+
+async function backupKey(password, salt, iterations) {
+  const base = await crypto.subtle.importKey("raw", utf8(password), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, base,
+    { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function makeBackup(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const payload = { identity: { pub: me.pub, privJwk: me.privJwk }, name: myName(), state: S };
+  const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await backupKey(password, salt, KDF_ITERATIONS), utf8(JSON.stringify(payload)));
+  return JSON.stringify({
+    format: "p2pchat-backup", version: 1, created: new Date().toISOString(), account: me.id,
+    kdf: { name: "PBKDF2", hash: "SHA-256", iterations: KDF_ITERATIONS, salt: b64u(salt) },
+    cipher: { name: "AES-GCM", iv: b64u(iv) },
+    data: b64u(data),
+  });
+}
+async function readBackup(text, password) {
+  let f;
+  try { f = JSON.parse(text); } catch { throw new Error("This isn't a P2P Chat backup file."); }
+  if (!f || f.format !== "p2pchat-backup") throw new Error("This isn't a P2P Chat backup file.");
+  if (f.version !== 1) throw new Error("This backup was made by a newer version of P2P Chat. Reload the page and try again.");
+  let payload;
+  try {
+    const key = await backupKey(password, unb64u(f.kdf.salt), f.kdf.iterations);
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64u(f.cipher.iv) }, key, unb64u(f.data));
+    payload = JSON.parse(new TextDecoder().decode(plain));
+  } catch { throw new Error("Wrong password, or the file is damaged."); }
+  // Make sure the private key really belongs to the public key before trusting it.
+  const id = payload && payload.identity && await openIdentity(payload.identity).catch(() => null);
+  const probe = "p2pchat-backup-check";
+  const sig = id && b64u(await crypto.subtle.sign(SIG, id.priv, utf8(probe)));
+  if (!id || !(await verify(id.pub, sig, probe))) throw new Error("The account in this backup is damaged.");
+  return payload;
+}
+function applyRestore(payload) {
+  active = false; // stop this page from saving over the restored data
+  localStorage.setItem(IDENTITY_KEY, JSON.stringify(payload.identity));
+  localStorage.setItem(STATE_KEY, JSON.stringify(payload.state || { contacts: {}, convs: {}, outbox: [] }));
+  if (payload.name) localStorage.setItem("p2pchat.nick", payload.name);
+  try { sessionStorage.setItem("p2pchat.restored", "1"); } catch {}
+  location.reload();
+}
+const backupFileName = () =>
+  `p2pchat-backup-${(myName().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "account")}-${new Date().toISOString().slice(0, 10)}.json`;
+
+function backupForm(onDone) {
+  const pw1 = el("input", { type: "password", autocomplete: "new-password", minLength: 8 });
+  const pw2 = el("input", { type: "password", autocomplete: "new-password" });
+  const err = el("div", { className: "error", role: "alert" });
+  const go = el("button", { type: "button", className: "primary", textContent: "Download backup" });
+  go.onclick = async () => {
+    err.textContent = "";
+    if (pw1.value.length < 8) { err.textContent = "Use at least 8 characters."; pw1.focus(); return; }
+    if (pw1.value !== pw2.value) { err.textContent = "The passwords don't match."; pw2.focus(); return; }
+    go.disabled = true; go.textContent = "Encrypting…";
+    try { download(backupFileName(), await makeBackup(pw1.value)); onDone(); }
+    catch (e) { err.textContent = "Couldn't create the backup: " + (e.message || e); }
+    go.disabled = false; go.textContent = "Download backup";
+  };
+  return el("div", {},
+    field("Backup password", pw1), field("Repeat password", pw2),
+    el("p", { className: "hint", textContent: "The file contains your account key and your chats, encrypted with this password. Without the password the backup can't be opened, and nobody can reset it." }),
+    err, el("div", { className: "actions" }, go));
+}
+
+function restoreForm(warning) {
+  const file = el("input", { type: "file", accept: ".json,application/json" });
+  const pw = el("input", { type: "password", autocomplete: "current-password" });
+  const err = el("div", { className: "error", role: "alert" });
+  const go = el("button", { type: "button", className: "primary", textContent: "Restore account" });
+  go.onclick = async () => {
+    err.textContent = "";
+    if (!file.files[0]) { err.textContent = "Choose your backup file first."; return; }
+    go.disabled = true; go.textContent = "Decrypting…";
+    try { applyRestore(await readBackup(await file.files[0].text(), pw.value)); }
+    catch (e) { err.textContent = e.message || String(e); go.disabled = false; go.textContent = "Restore account"; }
+  };
+  return el("div", {},
+    field("Backup file", file), field("Backup password", pw),
+    warning ? el("p", { className: "hint", textContent: warning }) : null,
+    err, el("div", { className: "actions" }, go));
+}
+
+// ---------- onboarding ----------
+const obCard = $("obCard");
+const obViews = {
+  start() {
+    const name = el("input", { type: "text", maxLength: 32, autocomplete: "nickname", placeholder: "e.g. Alex", value: nickEl.value });
+    const err = el("div", { className: "error", role: "alert" });
+    const go = el("button", { type: "submit", className: "primary", textContent: "Create account" });
+    const form = el("form", {},
+      el("p", { className: "step-label", textContent: "Step 1 of 2" }),
+      el("h2", { textContent: "Create your account" }),
+      el("p", { textContent: "Pick the name your friends will see. You can change it any time." }),
+      field("Your name", name), err, el("div", { className: "actions" }, go));
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      if (!name.value.trim()) { err.textContent = "Please enter a name."; name.focus(); return; }
+      go.disabled = true; go.textContent = "Creating your key…";
+      try {
+        const rec = await createIdentity();
+        localStorage.setItem(IDENTITY_KEY, JSON.stringify(rec));
+        me = await openIdentity(rec);
+        nickEl.value = name.value.trim(); store.set("p2pchat.nick", nickEl.value);
+        obShow("backup");
+      } catch (e2) { err.textContent = "Couldn't create your account: " + (e2.message || e2); go.disabled = false; go.textContent = "Create account"; }
+    };
+    const restore = el("button", { type: "button", textContent: "Restore from a backup", onclick: () => obShow("restore") });
+    setTimeout(() => name.focus());
+    return [form, el("div", { className: "or", textContent: "or" }), el("div", { className: "actions" }, restore)];
+  },
+  backup() {
+    return [
+      el("p", { className: "step-label", textContent: "Step 2 of 2" }),
+      el("h2", { textContent: "Back up your account" }),
+      el("p", { textContent: "Your account exists only in this browser. If you clear your browser data or lose this device, it's gone, unless you have a backup. You can also use the backup to move to another device." }),
+      backupForm(() => obShow("saved")),
+      el("div", { className: "actions" }, el("button", { type: "button", className: "link", textContent: "Skip for now", onclick: finishOnboarding })),
+      el("p", { className: "hint", textContent: "You can back up later under Account in the sidebar." }),
+    ];
+  },
+  saved() {
+    const go = el("button", { type: "button", className: "primary", textContent: "Start chatting", onclick: finishOnboarding });
+    setTimeout(() => go.focus());
+    return [
+      el("h2", { className: "ob-ok", textContent: "Backup saved" }),
+      el("p", { textContent: "Keep the file and its password somewhere safe, for example in your password manager. Anyone with both can use your account." }),
+      el("div", { className: "actions" }, go),
+    ];
+  },
+  restore() {
+    return [
+      el("h2", { textContent: "Restore your account" }),
+      el("p", { textContent: "Choose the backup file you downloaded earlier and enter its password. Your account, contacts and chats come back." }),
+      restoreForm(""),
+      el("div", { className: "actions" }, el("button", { type: "button", className: "link", textContent: "Back", onclick: () => obShow("start") })),
+    ];
+  },
+};
+function obShow(view) { obCard.replaceChildren(...obViews[view]()); }
+function finishOnboarding() { $("onboarding").hidden = true; startApp(); }
+
 // ---------- conversations ----------
 const dmId = (cid) => "dm:" + cid;
-const contactName = (cid) => (cid === myId ? myName() : (S.contacts[cid] && S.contacts[cid].name) || "Unknown");
+const contactName = (cid) => (cid === me.id ? myName() : (S.contacts[cid] && S.contacts[cid].name) || "Unknown");
 const convName = (c) => (c.type === "dm" ? contactName(c.peer) : c.name);
-const recipients = (c) => (c.type === "dm" ? [c.peer] : c.members.filter((id) => id !== myId));
+const recipients = (c) => (c.type === "dm" ? [c.peer] : c.members.filter((id) => id !== me.id));
 let current = null; // open conversation id
 
 function ensureDm(cid) {
@@ -379,7 +696,7 @@ function ensureDm(cid) {
 function addToConv(c, m) {
   c.msgs.push(m);
   c.updated = Date.now();
-  if (!m.sys && m.from !== myId && (c.id !== current || document.hidden)) c.unread = (c.unread || 0) + 1;
+  if (!m.sys && m.from !== me.id && (c.id !== current || document.hidden)) c.unread = (c.unread || 0) + 1;
   save();
 }
 const sysNote = (c, text) => addToConv(c, { id: uid(), sys: true, text, ts: Date.now() });
@@ -388,24 +705,20 @@ const sysNote = (c, text) => addToConv(c, { id: uid(), sys: true, text, ts: Date
 const CODE_PREFIX = "P2PCHAT1:";
 
 async function encodeCode(obj) {
-  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  const bytes = utf8(JSON.stringify(obj));
   let out = bytes;
   if (window.CompressionStream) {
     const s = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"));
     out = new Uint8Array(await new Response(s).arrayBuffer());
   }
-  let bin = ""; out.forEach((b) => (bin += String.fromCharCode(b)));
-  return CODE_PREFIX + (window.CompressionStream ? "z" : "j") +
-    btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return CODE_PREFIX + (window.CompressionStream ? "z" : "j") + b64u(out);
 }
 
 async function decodeCode(code) {
   code = code.replace(/\s+/g, "");
   if (!code.startsWith(CODE_PREFIX)) throw new Error("This doesn't look like a P2P Chat code.");
   const kind = code[CODE_PREFIX.length];
-  let b64 = code.slice(CODE_PREFIX.length + 1).replace(/-/g, "+").replace(/_/g, "/");
-  while (b64.length % 4) b64 += "=";
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const bytes = unb64u(code.slice(CODE_PREFIX.length + 1));
   let text;
   if (kind === "z") {
     const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
@@ -417,7 +730,7 @@ async function decodeCode(code) {
 }
 
 // ---------- WebRTC ----------
-const peers = new Map(); // key -> { key, pc, dc, cid, status: "pending"|"ok" }
+const peers = new Map(); // key -> { key, pc, dc, cid, status: "pending"|"ok", queue }
 
 function rtcConfig() {
   const s = stunEl.value.trim();
@@ -444,10 +757,16 @@ function gatherComplete(pc, timeoutMs = 4000) {
   });
 }
 
+// The DTLS certificate fingerprints of both ends of this exact connection.
+function fingerprints(pc) {
+  const f = (d) => ((d && d.sdp.match(/^a=fingerprint:(.+)$/m)) || [])[1];
+  return { local: (f(pc.localDescription) || "").trim().toUpperCase(), remote: (f(pc.remoteDescription) || "").trim().toUpperCase() };
+}
+
 function newPeer() {
   const key = uid();
   const pc = new RTCPeerConnection(rtcConfig());
-  const peer = { key, pc, dc: null, cid: null, status: "pending" };
+  const peer = { key, pc, dc: null, cid: null, status: "pending", queue: Promise.resolve() };
   peers.set(key, peer);
   pc.addEventListener("connectionstatechange", () => {
     if (["failed", "closed", "disconnected"].includes(pc.connectionState)) removePeer(peer);
@@ -457,9 +776,12 @@ function newPeer() {
 
 function attachChannel(peer, dc) {
   peer.dc = dc;
-  dc.addEventListener("open", () => { peer.status = "ok"; sendPeer(peer, helloPkt()); });
+  dc.addEventListener("open", async () => { peer.status = "ok"; sendPeer(peer, await helloPkt(peer)); });
   dc.addEventListener("close", () => removePeer(peer));
-  dc.addEventListener("message", (e) => onData(peer, e.data));
+  // Handle packets one at a time per connection: verifying signatures is asynchronous.
+  dc.addEventListener("message", (e) => {
+    peer.queue = peer.queue.then(() => onData(peer, e.data)).catch((err) => console.error(err));
+  });
 }
 
 function removePeer(peer) {
@@ -500,16 +822,24 @@ async function joinWithInvite(code) {
 }
 
 // ---------- delivery ----------
-// Every packet we author stays in the outbox until the recipient acknowledges it
-// ({t:"ack", pid}). It's sent right away if they're connected, and again whenever
-// they connect, so nothing is lost when a connection dies silently (closed laptop,
-// network change). Receivers de-duplicate by pid / message id. Group packets are
-// additionally relayed by every member to the members they're connected to.
+// Every packet we author is signed and stays in the outbox until the recipient
+// acknowledges it ({t:"ack", pid}). It's sent right away if they're connected, and
+// again whenever they connect, so nothing is lost when a connection dies silently.
+// Receivers de-duplicate by pid / message id. Group packets are additionally
+// relayed by every member to the members they're connected to; the author's
+// signature stops relaying members from changing or forging them.
 const seen = new Set();
 const okPeers = () => [...peers.values()].filter((p) => p.status === "ok" && p.cid);
 function peerFor(cid) { for (const p of peers.values()) if (p.cid === cid && p.status === "ok") return p; return null; }
 const isOnline = (cid) => !!peerFor(cid);
-const helloPkt = () => ({ t: "hello", id: myId, name: myName(), v: APP_VERSION });
+
+// The hello proves who we are: it signs both certificate fingerprints of this
+// connection, so it can't be replayed on another connection.
+async function helloPkt(peer) {
+  const fp = fingerprints(peer.pc);
+  return { t: "hello", proto: PROTO, v: APP_VERSION, id: me.id, pub: me.pub, name: myName(),
+    sig: await sign(`p2pchat-hello\n${fp.local}\n${fp.remote}`) };
+}
 
 function sendPeer(peer, pkt) {
   if (!peer.dc || peer.dc.readyState !== "open") return false;
@@ -540,35 +870,49 @@ function onAck(cid, pid) {
   save();
 }
 function relay(src, p, c) {
-  if (!p.pid || !c || c.type !== "group") return;
+  if (!c || c.type !== "group") return;
   for (const q of okPeers()) if (q !== src && q.cid !== p.from && c.members.includes(q.cid)) sendPeer(q, p);
 }
 
 // ---------- incoming packets ----------
-function onData(peer, raw) {
-  if (!active) return;
+async function onData(peer, raw) {
+  if (!active || !me) return;
   let p; try { p = JSON.parse(raw); } catch { return; }
   if (!p || typeof p !== "object" || typeof p.t !== "string") return;
   if (p.t === "hello") return onHello(peer, p);
-  if (!peer.cid) return; // must introduce itself first
+  if (!peer.cid) return; // must prove who it is first
   if (p.t === "ack") { onAck(peer.cid, clip(p.pid, 64)); return render(); }
   if (typeof p.pid !== "string") return;
   sendPeer(peer, { t: "ack", pid: p.pid }); // ack duplicates too: the earlier ack may have been lost
   if (seen.has(p.pid)) return;
-  seen.add(p.pid);
-  if (typeof p.group === "string") onGroupPacket(peer, p);
-  else onDirectPacket(peer, p);
+  const valid = typeof p.group === "string" ? await onGroupPacket(peer, p) : await onDirectPacket(peer, p);
+  if (valid) seen.add(p.pid);
   render();
 }
 
-function onHello(peer, p) {
-  const id = clip(p.id, 64);
-  if (!id) return;
-  if (id === myId) return removePeer(peer); // connected to ourselves
+function flowError(text) {
+  $("flow").append(el("div", { className: "error", role: "alert", textContent: text }));
+}
+
+async function onHello(peer, p) {
+  const fail = (why) => { if (pendingPeer === peer) flowError(why); removePeer(peer); };
+  if (p.proto !== PROTO) return fail("The other person uses a different version of P2P Chat. Ask them to reload the page, then swap new codes.");
+  const pub = clip(p.pub, 200), id = clip(p.id, 64);
+  const fp = fingerprints(peer.pc);
+  const ok = pub && id && (await idFromPub(pub)) === id && fp.local && fp.remote &&
+    (await verify(pub, clip(p.sig, 200), `p2pchat-hello\n${fp.remote}\n${fp.local}`));
+  if (!ok) return fail("Couldn't verify who's on the other end, so the connection was closed.");
+  if (id === me.id) return fail("That's your own code. Send it to someone else.");
+  if (peer.cid && peer.cid !== id) return removePeer(peer); // a connection can't switch identities
+
   const name = clip(p.name, 32).trim() || "Anonymous";
   const known = S.contacts[id];
+  if (!known) {
+    const same = Object.entries(S.contacts).find(([cid, ct]) => ct.name.toLowerCase() === name.toLowerCase());
+    if (same) sysNote(ensureDm(id), `You already have a contact called ${same[1].name} with a different account. If this is the same person, they may have made a new account. Use “Verify” to be sure.`);
+  }
   peer.cid = id;
-  S.contacts[id] = { name, lastSeen: Date.now() };
+  S.contacts[id] = { ...known, name, pub, lastSeen: Date.now() };
   const c = ensureDm(id);
   if (known && known.name !== name) sysNote(c, `${known.name} is now called ${name}.`);
   save();
@@ -580,10 +924,7 @@ function onHello(peer, p) {
 function receivedMsg(c, p, from) {
   const id = clip(p.id, 64);
   if (!id || typeof p.text !== "string" || c.msgs.some((m) => m.id === id)) return;
-  const ts = Number(p.ts) || Date.now();
-  addToConv(c, { id, from, text: p.text.slice(0, 10000), ts });
-  if (from === myId) return;
-  if (!S.contacts[from]) S.contacts[from] = { name: clip(p.name, 32) || "Unknown" };
+  addToConv(c, { id, from, text: p.text.slice(0, 10000), ts: Number(p.ts) || Date.now() });
   const where = c.type === "group" ? ` in ${c.name}` : "";
   $("announcer").textContent = `${contactName(from)}${where}: ${p.text.slice(0, 300)}`;
 }
@@ -592,82 +933,100 @@ function receivedDelete(c, msgId, from) {
   if (m && m.from === from) { m.deleted = true; m.text = ""; save(); }
 }
 
-function onDirectPacket(peer, p) {
+async function onDirectPacket(peer, p) {
+  if (p.from !== peer.cid || !(await verifyPkt(p, S.contacts[peer.cid].pub))) return false;
   const c = ensureDm(peer.cid);
   if (p.t === "msg") receivedMsg(c, p, peer.cid);
   else if (p.t === "del") receivedDelete(c, p.id, peer.cid);
+  else return false;
+  return true;
 }
 
-function onGroupPacket(peer, p) {
+async function onGroupPacket(peer, p) {
   const gid = clip(p.group, 64);
   const from = clip(p.from, 64);
   let c = S.convs[gid];
+
   if (p.t === "group") {
-    const members = (Array.isArray(p.members) ? p.members.slice(0, 100) : [])
-      .filter((x) => x && typeof x.id === "string")
-      .map((x) => ({ id: clip(x.id, 64), name: clip(x.name, 32) }));
-    if (!members.some((x) => x.id === myId)) return;
-    for (const x of members) if (x.id !== myId && !S.contacts[x.id]) S.contacts[x.id] = { name: x.name || "Unknown" };
+    // Member list with public keys; each ID must match its key.
+    const members = [];
+    for (const x of Array.isArray(p.members) ? p.members.slice(0, 100) : []) {
+      if (!x || typeof x.id !== "string" || typeof x.pub !== "string") continue;
+      if ((await idFromPub(x.pub)) !== x.id) continue;
+      members.push({ id: x.id, name: clip(x.name, 32) || "Unknown", pub: x.pub });
+    }
+    const adder = members.find((x) => x.id === from);
+    if (!adder || !(await verifyPkt(p, adder.pub))) return false;
+    if (!members.some((x) => x.id === me.id)) return false;
+    if (c && (c.type !== "group" || !c.members.includes(from))) return false; // only members may add people
+    for (const x of members) {
+      if (x.id === me.id) continue;
+      if (!S.contacts[x.id]) S.contacts[x.id] = { name: x.name, pub: x.pub };
+      else if (!S.contacts[x.id].pub) S.contacts[x.id].pub = x.pub;
+    }
     const ids = members.map((x) => x.id);
     if (!c) {
       c = S.convs[gid] = { id: gid, type: "group", name: clip(p.gname, 60) || "Group", members: ids, msgs: [], unread: 0, updated: Date.now() };
       sysNote(c, `${contactName(from)} added you to the group.`);
-      c.unread = (c.unread || 0) + (c.id === current ? 0 : 1);
-    } else if (c.type === "group") {
+      if (c.id !== current) c.unread = (c.unread || 0) + 1;
+    } else {
       const added = ids.filter((id) => !c.members.includes(id));
       c.members = [...new Set([...c.members, ...ids])];
       if (added.length) sysNote(c, `${contactName(from)} added ${added.map(contactName).join(", ")}.`);
     }
   } else {
-    if (!c || c.type !== "group" || !c.members.includes(myId)) return; // unknown group or we left it
+    if (!c || c.type !== "group" || !c.members.includes(me.id) || !c.members.includes(from)) return false;
+    if (!(await verifyPkt(p, S.contacts[from] && S.contacts[from].pub))) return false;
     if (p.t === "msg") receivedMsg(c, p, from);
     else if (p.t === "del") receivedDelete(c, p.id, from);
-    else if (p.t === "leave" && c.members.includes(from)) {
+    else if (p.t === "leave") {
       c.members = c.members.filter((x) => x !== from);
       sysNote(c, `${contactName(from)} left the group.`);
-    }
+    } else return false;
   }
   relay(peer, p, S.convs[gid]);
+  return true;
 }
 
 // ---------- actions ----------
-function sendText(c, text) {
-  const m = { id: uid(), from: myId, text, ts: Date.now(), pending: true };
+async function sendText(c, text) {
+  const m = { id: uid(), from: me.id, text, ts: Date.now(), pending: true };
   addToConv(c, m);
-  const pkt = { t: "msg", pid: m.id, id: m.id, from: myId, name: myName(), text, ts: m.ts };
-  if (c.type === "group") pkt.group = c.id;
+  render();
+  const pkt = await signPkt({ t: "msg", pid: m.id, id: m.id, from: me.id, name: myName(), text, ts: m.ts,
+    group: c.type === "group" ? c.id : undefined });
   seen.add(pkt.pid);
   for (const cid of recipients(c)) deliver(cid, pkt, c.id);
   if (!recipients(c).length) m.pending = false;
   save(); render();
 }
 
-function sendGroupInfo(c) {
-  const pkt = {
-    t: "group", pid: uid(), group: c.id, gname: c.name, from: myId,
-    members: c.members.map((id) => ({ id, name: contactName(id) })),
-  };
+async function sendGroupInfo(c) {
+  const pkt = await signPkt({
+    t: "group", pid: uid(), group: c.id, gname: c.name, from: me.id,
+    members: c.members.map((id) => ({ id, name: contactName(id), pub: id === me.id ? me.pub : S.contacts[id].pub })),
+  });
   seen.add(pkt.pid);
   for (const cid of recipients(c)) deliver(cid, pkt, c.id);
 }
 
-function createGroup(name, ids) {
+async function createGroup(name, ids) {
   const gid = uid();
-  const c = S.convs[gid] = { id: gid, type: "group", name, members: [myId, ...ids], msgs: [], unread: 0, updated: Date.now() };
+  const c = S.convs[gid] = { id: gid, type: "group", name, members: [me.id, ...ids], msgs: [], unread: 0, updated: Date.now() };
   sysNote(c, "You created the group.");
-  sendGroupInfo(c);
   openConv(gid);
+  await sendGroupInfo(c);
 }
 
-function addMembers(c, ids) {
+async function addMembers(c, ids) {
   c.members = [...new Set([...c.members, ...ids])];
   sysNote(c, `You added ${ids.map(contactName).join(", ")}.`);
-  sendGroupInfo(c);
   save(); render();
+  await sendGroupInfo(c);
 }
 
 async function deleteMessage(c, m) {
-  const mine = m.from === myId && !m.deleted;
+  const mine = m.from === me.id && !m.deleted;
   const others = c.type === "dm" ? contactName(c.peer) : "the other members";
   const v = await ask("Delete message?",
     mine ? `“Delete for everyone” also removes it from ${others}'s chat. If they already read it, they may remember or have copied it.`
@@ -678,9 +1037,8 @@ async function deleteMessage(c, m) {
     c.msgs = c.msgs.filter((x) => x !== m);
   } else if (v === "everyone") {
     m.deleted = true; m.text = ""; m.pending = false;
-    S.outbox = S.outbox.filter((o) => !(o.pkt.t === "msg" && o.pkt.id === m.id)); // not sent yet: just don't
-    const pkt = { t: "del", pid: uid(), id: m.id, from: myId };
-    if (c.type === "group") pkt.group = c.id;
+    S.outbox = S.outbox.filter((o) => !(o.pkt.t === "msg" && o.pkt.id === m.id)); // not delivered yet: just don't
+    const pkt = await signPkt({ t: "del", pid: uid(), id: m.id, from: me.id, group: c.type === "group" ? c.id : undefined });
     seen.add(pkt.pid);
     for (const cid of recipients(c)) deliver(cid, pkt, c.id);
   } else return;
@@ -696,13 +1054,26 @@ async function deleteChat(c) {
   if (v !== "delete") return;
   S.outbox = S.outbox.filter((o) => o.conv !== c.id); // cancel anything still waiting for this chat
   if (group) {
-    const pkt = { t: "leave", pid: uid(), group: c.id, from: myId };
+    const pkt = await signPkt({ t: "leave", pid: uid(), group: c.id, from: me.id });
     seen.add(pkt.pid);
     for (const cid of recipients(c)) deliver(cid, pkt, null);
   }
   delete S.convs[c.id];
   if (current === c.id) { current = null; document.body.classList.remove("show-chat"); }
   save(); render();
+}
+
+async function openVerify(cid) {
+  const ct = S.contacts[cid];
+  const numbers = await safetyNumber(cid);
+  const done = el("button", { type: "button", className: "primary",
+    textContent: ct.verified ? "Close" : "They match, mark as verified",
+    onclick: () => { if (!ct.verified) { ct.verified = true; sysNote(ensureDm(cid), `You verified ${ct.name}.`); save(); render(); } $("formDlg").close(); } });
+  showForm(`Verify ${ct.name}`,
+    el("p", { className: "hint", textContent: `Compare this number with ${ct.name}, in person or on a call. In their app it's under “Verify” in your chat. If both match, your connection is really with ${ct.name}'s account and nobody tampered with the codes you swapped.` }),
+    el("div", { className: "safety", ariaLabel: "Security number" }, ...numbers.map((n) => el("span", { textContent: n }))),
+    ct.verified ? el("p", { className: "hint", textContent: `You've already verified ${ct.name}.` }) : null,
+    el("div", { className: "actions" }, done));
 }
 
 // ---------- dialogs ----------
@@ -715,6 +1086,11 @@ function ask(title, text, buttons) {
   d.showModal();
   $("askActions").lastChild.focus(); // the safe choice ("Cancel") gets focus
   return new Promise((res) => d.addEventListener("close", () => res(d.returnValue), { once: true }));
+}
+function showForm(title, ...nodes) {
+  $("formTitle").textContent = title;
+  $("formBody").replaceChildren(...nodes.filter(Boolean));
+  $("formDlg").showModal();
 }
 
 // Connect dialog: create an invite, or join with one
@@ -814,7 +1190,7 @@ function openPick(mode, c) {
   $("groupName").value = "";
   $("pickOk").textContent = group ? "Create group" : "Add";
   const list = Object.entries(S.contacts)
-    .filter(([id]) => id !== myId && (group || !c.members.includes(id)))
+    .filter(([id, ct]) => id !== me.id && ct.pub && (group || !c.members.includes(id)))
     .sort((a, b) => a[1].name.localeCompare(b[1].name));
   $("pickHint").textContent = !list.length
     ? (group ? "You can add people you've connected to before. Connect to someone first." : "Everyone you know is already in this group.")
@@ -860,7 +1236,7 @@ function preview(c) {
     const m = c.msgs[i];
     if (m.sys) return m.text;
     if (m.deleted) return "Message deleted";
-    const who = m.from === myId ? "You: " : c.type === "group" ? contactName(m.from) + ": " : "";
+    const who = m.from === me.id ? "You: " : c.type === "group" ? contactName(m.from) + ": " : "";
     return who + m.text;
   }
   return c.type === "dm" ? "No messages yet" : "";
@@ -895,14 +1271,14 @@ function renderList() {
 }
 
 function membersLine(c) {
-  const others = c.members.filter((id) => id !== myId);
+  const others = c.members.filter((id) => id !== me.id);
   const online = others.filter(isOnline).length;
   return ["You", ...others.map(contactName)].join(", ") + (online ? ` · ${online} connected` : " · nobody connected");
 }
 
 function renderMsg(c, m) {
   if (m.sys) return el("div", { className: "sys", textContent: m.text });
-  const mine = m.from === myId;
+  const mine = m.from === me.id;
   const meta = (mine ? "You" : contactName(m.from)) + " · " + fmtTime(m.ts) + (m.pending ? " · Not delivered yet" : "");
   return el("div", { className: "msg" + (mine ? " mine" : "") + (m.deleted ? " deleted" : "") },
     el("div", { className: "meta" },
@@ -921,8 +1297,10 @@ function renderChat() {
   const actions = [];
   if (c.type === "dm") {
     const on = isOnline(c.peer);
-    $("chatSub").textContent = on ? "Connected" : "Not connected. Your messages are sent when you reconnect.";
+    const ct = S.contacts[c.peer] || {};
+    $("chatSub").textContent = (on ? "Connected" : "Not connected. Your messages are sent when you reconnect.") + (ct.verified ? " · Verified ✓" : "");
     if (!on) actions.push(el("button", { type: "button", textContent: "Reconnect", onclick: openConnect }));
+    if (ct.pub) actions.push(el("button", { type: "button", textContent: ct.verified ? "Verified ✓" : "Verify", onclick: () => openVerify(c.peer) }));
     $("text").placeholder = on ? "Type a message…" : `Message (sent when ${convName(c)} is connected)`;
   } else {
     $("chatSub").textContent = membersLine(c);
@@ -954,7 +1332,13 @@ function renderChat() {
   if (atBottom) msgs.scrollTop = msgs.scrollHeight;
 }
 
+function renderAccount() {
+  if (!me) return;
+  $("accountInfo").textContent = `Your account exists only in this browser. Back it up to keep it safe or to move it to another device. Account ID: ${me.id.slice(0, 10)}…`;
+}
+
 function render() {
+  if (!me) return;
   renderList();
   renderChat();
   const unread = Object.values(S.convs).reduce((n, c) => n + (c.unread || 0), 0);
@@ -976,6 +1360,11 @@ $("btnConnect").onclick = openConnect;
 $("btnWelcomeConnect").onclick = openConnect;
 $("btnNewGroup").onclick = () => openPick("new");
 $("btnBack").onclick = () => { current = null; document.body.classList.remove("show-chat"); render(); };
+$("btnBackup").onclick = () => showForm("Back up your account",
+  el("p", { className: "hint", textContent: "Downloads your account key, contacts and chats as one encrypted file." }),
+  backupForm(() => { $("formDlg").close(); }));
+$("btnRestore").onclick = () => showForm("Restore from backup",
+  restoreForm("This replaces the account and chats in this browser with the ones from the backup. Back up the current account first if you want to keep it."));
 $("composer").addEventListener("submit", (e) => {
   e.preventDefault();
   const c = current && S.convs[current];
@@ -985,7 +1374,7 @@ $("composer").addEventListener("submit", (e) => {
   $("text").value = "";
 });
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden || !current || !S.convs[current]) return;
+  if (!me || document.hidden || !current || !S.convs[current]) return;
   S.convs[current].unread = 0; save(); render();
 });
 window.addEventListener("beforeunload", () => { for (const p of peers.values()) try { p.pc.close(); } catch {} });
@@ -999,7 +1388,7 @@ $("ver").textContent = "v" + APP_VERSION;
 const UPDATE_CHECK_MS = 5 * 60 * 1000;
 let latestVersion = null;
 
-const isIdle = () => peers.size === 0 && !document.querySelector("dialog[open]");
+const isIdle = () => peers.size === 0 && !document.querySelector("dialog[open]") && $("onboarding").hidden;
 
 async function applyUpdate() {
   try { sessionStorage.setItem("p2pchat.reloadedFor", latestVersion); } catch {}
@@ -1030,11 +1419,28 @@ async function checkForUpdate() {
 }
 
 $("btnUpdate").onclick = applyUpdate;
-checkForUpdate();
-setInterval(checkForUpdate, UPDATE_CHECK_MS);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
 
-render();
+// ---------- start ----------
+function startApp() {
+  renderAccount();
+  render();
+  let restored = false;
+  try { restored = sessionStorage.getItem("p2pchat.restored") === "1"; sessionStorage.removeItem("p2pchat.restored"); } catch {}
+  if (restored) $("announcer").textContent = "Your account was restored.";
+}
+
+async function start() {
+  setInterval(checkForUpdate, UPDATE_CHECK_MS);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
+  checkForUpdate();
+  if (!window.isSecureContext || !window.crypto || !crypto.subtle) { $("insecure").hidden = false; return; }
+  const rec = loadIdentityRecord();
+  if (!rec) { $("onboarding").hidden = false; obShow("start"); return; }
+  try { me = await openIdentity(rec); }
+  catch { $("onboarding").hidden = false; obShow("start"); return; }
+  startApp();
+}
+start();
 </script>
 </body>
 </html>

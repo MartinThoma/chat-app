@@ -5,10 +5,15 @@ A messenger in a single HTML file that needs no server. People connect by swappi
 Use it at **https://martin-thoma.com/chat-app/**, or run it yourself:
 
 - Open `index.html` in a browser (double-click works), or
-- run `make run` to serve it on your network. It prints the URLs and your local IP. Set the port with `make run PORT=9000`.
+- run `make run` to serve it on your network over HTTPS. It prints the URLs and your local IP. Set the port with `make run PORT=9000`.
+
+`make run` uses a self-signed certificate, created on first run in `.cert/` with `openssl`. Browsers show a warning once; choose "Advanced" → "Proceed". HTTPS is required because the app uses the browser's cryptography, which browsers only allow on `https://` and `localhost`.
 
 ## Features
 
+- No sign-up: your account is a key pair created in your browser on first use. A short onboarding screen explains the app and offers a password-protected backup.
+- Everything you send is signed, so nobody can pretend to be you or change your messages. A security number lets two people verify each other.
+- Back up your account to a file and restore it on another device.
 - Personal chats and group chats. Group members don't all need to be connected to each other: members pass messages on.
 - Messages written while someone isn't connected are sent when they reconnect, with a "Not delivered yet" marker until then.
 - Delete a message for yourself, or your own message for everyone. Delete a chat, or leave a group.
@@ -16,7 +21,7 @@ Use it at **https://martin-thoma.com/chat-app/**, or run it yourself:
 - Light and dark mode, works on phones.
 - Updates itself when a new version is published.
 
-See [PRODUCT.md](PRODUCT.md) for the full feature description and its limits, and [DESIGN.md](DESIGN.md) for the look and feel.
+See [PRODUCT.md](PRODUCT.md) for the full feature description and its limits, [DESIGN.md](DESIGN.md) for the look and feel, and [ROADMAP.md](ROADMAP.md) for what's planned.
 
 ## How to connect
 
