@@ -76,6 +76,17 @@ Each code works only once. Mistakes give clear errors, for example "That's an in
 - **Leave group** removes you from the group for everyone and deletes the chat from your browser.
 - The group header lists the members and how many are connected right now.
 
+### Calls
+
+- **Call** and **Video call** sit in the header of a personal chat while the other person is connected. Calls use the existing connection, so no new codes are needed. Sound and video go directly between the two browsers, encrypted, like messages.
+- The browser asks for microphone (and camera) access the first time. The other person's phone only rings once that's granted.
+- **Incoming call:** a full-screen view with the caller's name, a ring tone, and **Accept**, **Decline** and, for video calls, **Answer without video**. The tab title says who's calling. Unanswered calls stop ringing after 45 seconds.
+- **During a call:** **Mute**, **Turn camera on/off** (also in a voice call), **Show chat** and **Hang up**. The other side sees when you're muted, and sees your avatar instead of video while your camera is off. Without a camera, a video call continues as a voice call.
+- **Show chat** shrinks the call into a green bar above the app ("Call with Bob · 3:12", **Return to call**, **Hang up**), so you can keep writing.
+- Every call leaves a note in the chat: "Video call, 3:12", "Bob declined the call.", "Bob didn't answer.", "Missed voice call from Alice." Missed calls count as unread.
+- **One call at a time.** A second caller is told that you're on another call, and you get a missed-call note. If two people call each other at the same moment, the calls merge into one.
+- A call ends when the connection drops (with a note). Closing the tab hangs up properly.
+
 ### Message delivery
 
 - Every message has a unique ID. Duplicates, for example from being passed on by several members, are ignored.
@@ -129,7 +140,9 @@ Only one tab can be connected and saving at a time. Opening the app in a second 
 - **Losing the key means a new account.** Without a backup, clearing browser data creates a new identity, and contacts see you as a new person.
 - **One device at a time.** A restored backup is the same account. Using it on two devices at once works, but each device keeps its own history.
 - **No upgrade path from 1.1.** Version 1.2 introduced key-based accounts. Chats from 1.1 stay in the browser's storage, but the app doesn't show them, and 1.1 and 1.2 can't connect to each other.
-- **Not included:** files and images, voice and video, reactions, editing, read receipts, typing indicators, push notifications.
+- **Calls are one-to-one.** There are no group calls yet, and nobody can join a running call.
+- **Calls need both people connected right now.** There's no ringing someone who isn't connected, and no voicemail.
+- **Not included:** files and images, reactions, editing, read receipts, typing indicators, push notifications.
 
 ## Protocol (for developers)
 
@@ -137,13 +150,16 @@ All packets are JSON sent over a single WebRTC data channel per connection. The 
 
 | Packet | Fields | Purpose |
 |---|---|---|
-| `hello` | `proto`, `v`, `id`, `pub`, `name`, `sig` | Sent first on every connection. `sig` signs `p2pchat-hello\n<own fingerprint>\n<other's fingerprint>`, using the DTLS fingerprints of this connection. `id` must equal the hash of `pub`. |
+| `hello` | `proto`, `v`, `caps`, `id`, `pub`, `name`, `sig` | Sent first on every connection. `sig` signs `p2pchat-hello\n<own fingerprint>\n<other's fingerprint>`, using the DTLS fingerprints of this connection. `id` must equal the hash of `pub`. `caps` lists optional features, currently `["call"]` (since 1.3). |
 | `msg` | `pid`, `id`, `from`, `name`, `text`, `ts`, `group?`, `sig` | A chat message. `group` set means a group message, otherwise a personal message. |
 | `del` | `pid`, `id`, `from`, `group?`, `sig` | Delete for everyone. Only honored if `from` wrote message `id`. |
 | `group` | `pid`, `group`, `gname`, `from`, `members[{id,name,pub}]`, `sig` | Create a group or add members. Only accepted from an existing member. |
 | `leave` | `pid`, `group`, `from`, `sig` | A member left |
+| `call` | `a`, `call`, `video?`, `mic?`, `cam?` | Call control, never stored or acknowledged. `a` is `ring` (with `video`), `accept`, `decline`, `busy`, `end`, or `state` (with `mic` and `cam`, sent when they change). `call` is a random call ID. |
+| `rtc` | `desc` or `cand` | Adds or removes microphone and camera on the existing connection: an SDP offer or answer, or an ICE candidate. Collisions are resolved by "perfect negotiation": the side with the smaller account ID gives way. |
 | `ack` | `pid` | Confirms receipt. The sender removes the packet from its outbox. Not signed, because it only travels over the connection the identity was proven on. |
 
 - **Signatures:** ECDSA P-256 with SHA-256, over `p2pchat-packet\n` followed by the packet without `sig`, serialized as JSON with sorted keys and no `undefined` fields. Keys and signatures are base64url.
+- **Unsigned packets:** `ack`, `call` and `rtc` aren't signed. They're only accepted on a connection whose `hello` was verified, so they can only come from that person.
 - **Passing on:** group packets (`group` set) are passed on to connected members, and duplicates are dropped by `pid`. Personal packets are accepted only directly from their author.
 - **Security number:** the SHA-256 hash of `p2pchat-safety\n<id1>\n<id2>`, with the IDs sorted. The first 24 bytes are read as six 32-bit numbers, each taken modulo 100000.

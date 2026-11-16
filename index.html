@@ -11,7 +11,8 @@
     --mine: #2f6fed; --mine-text: #fff; --theirs: #eceff4; --theirs-text: #1d2330;
     --hover: #eef1f6; --selected: #e3e9f6;
     --ok: #1f9d55; --bad: #c93636; --danger: #c93636; --danger-text: #fff;
-    --shadow: 0 8px 28px rgb(20 30 60 / .08);
+    --call: #137a42; --call-text: #fff;
+    --shadow: 0 8px 28px rgb(0 0 0 / .08);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -160,6 +161,48 @@
   .picklist label { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-radius: 8px; cursor: pointer; }
   .picklist label:hover { background: var(--hover); }
   .picklist .status { font-size: 12px; color: var(--muted); margin-left: auto; }
+  /* calls */
+  #callBar {
+    display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+    padding: 8px 16px; background: var(--call); color: var(--call-text);
+  }
+  #callBar button { padding: 3px 12px; }
+  dialog.call {
+    width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0;
+    border: 0; border-radius: 0; overflow: hidden; background: #0e1116; color: #fff;
+  }
+  dialog.call[open] { display: flex; flex-direction: column; }
+  .call-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
+  #remoteVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; visibility: hidden; }
+  dialog.call.has-video #remoteVideo { visibility: visible; }
+  .call-who { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 16px; }
+  .call-who h2 { font-size: 24px; margin: 0; }
+  .call-who p { margin: 0; color: #c3c9d5; }
+  dialog.call.has-video .call-who {
+    position: absolute; top: 16px; left: 16px; flex-direction: row; gap: 10px; text-align: left;
+    padding: 8px 14px 8px 8px; border-radius: 14px; background: rgb(0 0 0 / .55);
+  }
+  dialog.call.has-video .call-who h2 { font-size: 16px; }
+  dialog.call.has-video .call-who p { font-size: 12px; }
+  dialog.call.has-video .avatar.large { width: 40px; height: 40px; font-size: 16px; }
+  .avatar.large { width: 112px; height: 112px; font-size: 48px; }
+  #localVideo {
+    position: absolute; right: 16px; bottom: 16px; width: 176px; aspect-ratio: 4 / 3; object-fit: cover;
+    border-radius: 10px; background: #000; transform: scaleX(-1); border: 1px solid rgb(255 255 255 / .25);
+  }
+  .call-controls { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; padding: 16px 16px 24px; }
+  .call-controls button { border: 0; border-radius: 999px; padding: 12px 20px; background: rgb(255 255 255 / .14); color: #fff; }
+  .call-controls button:hover { background: rgb(255 255 255 / .22); }
+  .call-controls button.off { background: #fff; color: #0e1116; }
+  .call-controls button.danger { background: var(--danger); color: var(--danger-text); }
+  .call-controls button.accept { background: var(--call); color: var(--call-text); }
+  .call-controls button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  @media (max-width: 760px) {
+    #localVideo { width: 104px; right: 12px; bottom: 12px; }
+    .call-controls { gap: 8px; }
+    .call-controls button { padding: 10px 16px; }
+  }
+
   .safety { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; gap: 8px 20px; margin: 16px 0; font: 600 24px/1.2 ui-monospace, monospace; }
 
   /* full-screen pages: onboarding, insecure, second tab */
@@ -226,6 +269,11 @@
 <div id="update" role="status" hidden>
   <span id="updateText"></span>
   <button type="button" id="btnUpdate">Reload now</button>
+</div>
+<div id="callBar" role="status" hidden>
+  <span id="callBarText"></span>
+  <button type="button" id="btnCallReturn">Return to call</button>
+  <button type="button" id="btnCallBarEnd">Hang up</button>
 </div>
 
 <main>
@@ -324,6 +372,29 @@
   <div id="formBody"></div>
 </dialog>
 
+<dialog id="callDlg" class="call" aria-labelledby="callName" aria-describedby="callStatus">
+  <div class="call-stage">
+    <video id="remoteVideo" autoplay playsinline></video>
+    <div class="call-who">
+      <span id="callAvatar"></span>
+      <div>
+        <h2 id="callName"></h2>
+        <p id="callStatus"></p>
+      </div>
+    </div>
+    <video id="localVideo" autoplay playsinline muted hidden></video>
+  </div>
+  <div class="call-controls">
+    <button type="button" id="callMic">Mute</button>
+    <button type="button" id="callCam">Turn camera on</button>
+    <button type="button" id="callMin">Show chat</button>
+    <button type="button" id="callDecline" class="danger">Decline</button>
+    <button type="button" id="callVoice">Answer without video</button>
+    <button type="button" id="callAccept" class="accept">Accept</button>
+    <button type="button" id="callEnd" class="danger">Hang up</button>
+  </div>
+</dialog>
+
 <!-- Screen readers hear new incoming messages here (the message list itself is redrawn on every change). -->
 <div id="announcer" class="sr-only" aria-live="polite"></div>
 
@@ -365,7 +436,7 @@
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
@@ -790,6 +861,7 @@ function removePeer(peer) {
   try { peer.dc && peer.dc.close(); } catch {}
   try { peer.pc.close(); } catch {}
   if (pendingPeer === peer) pendingPeer = null;
+  if (call && call.peer === peer) callLost();
   render();
 }
 
@@ -837,7 +909,7 @@ const isOnline = (cid) => !!peerFor(cid);
 // connection, so it can't be replayed on another connection.
 async function helloPkt(peer) {
   const fp = fingerprints(peer.pc);
-  return { t: "hello", proto: PROTO, v: APP_VERSION, id: me.id, pub: me.pub, name: myName(),
+  return { t: "hello", proto: PROTO, v: APP_VERSION, caps: ["call"], id: me.id, pub: me.pub, name: myName(),
     sig: await sign(`p2pchat-hello\n${fp.local}\n${fp.remote}`) };
 }
 
@@ -882,6 +954,9 @@ async function onData(peer, raw) {
   if (p.t === "hello") return onHello(peer, p);
   if (!peer.cid) return; // must prove who it is first
   if (p.t === "ack") { onAck(peer.cid, clip(p.pid, 64)); return render(); }
+  // Calls: live signaling, never stored. The channel itself is authenticated by the hello.
+  if (p.t === "call") return onCall(peer, p);
+  if (p.t === "rtc") return onRtc(peer, p);
   if (typeof p.pid !== "string") return;
   sendPeer(peer, { t: "ack", pid: p.pid }); // ack duplicates too: the earlier ack may have been lost
   if (seen.has(p.pid)) return;
@@ -912,6 +987,8 @@ async function onHello(peer, p) {
     if (same) sysNote(ensureDm(id), `You already have a contact called ${same[1].name} with a different account. If this is the same person, they may have made a new account. Use “Verify” to be sure.`);
   }
   peer.cid = id;
+  peer.caps = Array.isArray(p.caps) ? p.caps.filter((x) => typeof x === "string").slice(0, 20) : [];
+  setupRenegotiation(peer);
   S.contacts[id] = { ...known, name, pub, lastSeen: Date.now() };
   const c = ensureDm(id);
   if (known && known.name !== name) sysNote(c, `${known.name} is now called ${name}.`);
@@ -1075,6 +1152,362 @@ async function openVerify(cid) {
     ct.verified ? el("p", { className: "hint", textContent: `You've already verified ${ct.name}.` }) : null,
     el("div", { className: "actions" }, done));
 }
+
+// ---------- calls ----------
+// Voice and video calls with someone you're connected to. A call reuses the existing
+// connection: microphone and camera are added to it, and the change is negotiated over
+// the chat channel, so no new codes are needed. One call at a time.
+const CALL_RING_MS = 45000;
+const VIDEO = { width: { ideal: 1280 }, height: { ideal: 720 } };
+// { id, cid, peer, dir: "out"|"in", video, state: "ringing"|"incoming"|"connecting"|"active",
+//   rang (the other side knows about the call), local: MediaStream, mic, cam, remoteMic, remoteCam, startedAt, ringTimer, tick }
+let call = null;
+const callDlg = $("callDlg");
+
+const callKind = (c) => (c.video ? "Video call" : "Voice call");
+function callDuration(c) {
+  const s = Math.max(0, Math.round((Date.now() - c.startedAt) / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+const sendCall = (c, a, extra = {}) => sendPeer(c.peer, { t: "call", a, call: c.id, ...extra });
+const sendState = () => call && call.state === "active" && sendCall(call, "state", { mic: call.mic, cam: call.cam });
+const stopStream = (s) => s && s.getTracks().forEach((t) => t.stop());
+const notice = (title, text) => ask(title, text, [["ok", "OK"]]);
+
+// "Perfect negotiation" (as described on MDN): either side may add or remove media at
+// any time. If both send an offer at once, the "polite" side gives way.
+function setupRenegotiation(peer) {
+  if (peer.nego) return;
+  const n = peer.nego = { making: false, ignore: false, polite: me.id < peer.cid };
+  const pc = peer.pc;
+  const sendDesc = () => sendPeer(peer, { t: "rtc", desc: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+  n.sendDesc = sendDesc;
+  pc.addEventListener("negotiationneeded", async () => {
+    try { n.making = true; await pc.setLocalDescription(); sendDesc(); }
+    catch (e) { console.error(e); }
+    finally { n.making = false; }
+  });
+  pc.addEventListener("icecandidate", (e) => { if (e.candidate) sendPeer(peer, { t: "rtc", cand: e.candidate.toJSON() }); });
+  pc.addEventListener("track", () => refreshRemote());
+}
+
+async function onRtc(peer, p) {
+  const n = peer.nego, pc = peer.pc;
+  if (!n || pc.signalingState === "closed") return;
+  try {
+    const d = p.desc;
+    if (d && (d.type === "offer" || d.type === "answer") && typeof d.sdp === "string") {
+      const collision = d.type === "offer" && (n.making || pc.signalingState !== "stable");
+      n.ignore = !n.polite && collision;
+      if (n.ignore) return;
+      await pc.setRemoteDescription({ type: d.type, sdp: d.sdp });
+      if (d.type === "offer") { await pc.setLocalDescription(); n.sendDesc(); }
+      refreshRemote();
+    } else if (p.cand && typeof p.cand === "object") {
+      try { await pc.addIceCandidate(p.cand); } catch (e) { if (!n.ignore) throw e; }
+    }
+  } catch (e) { console.error(e); }
+}
+
+const remoteTracks = (pc) => pc.getTransceivers()
+  .filter((t) => t.currentDirection === "sendrecv" || t.currentDirection === "recvonly")
+  .map((t) => t.receiver.track);
+
+function refreshRemote() {
+  if (!call || call.state !== "active") return;
+  const tracks = remoteTracks(call.peer.pc);
+  const v = $("remoteVideo");
+  const cur = v.srcObject ? v.srcObject.getTracks() : [];
+  if (cur.length !== tracks.length || tracks.some((t) => !cur.includes(t))) {
+    v.srcObject = tracks.length ? new MediaStream(tracks) : null;
+    if (tracks.length) v.play().catch(() => {});
+  }
+  renderCall();
+}
+
+// Reuse a transceiver from an earlier call (or one the other side just offered),
+// so that calling again and again doesn't keep growing the connection.
+function attachTrack(pc, track, stream) {
+  const t = pc.getTransceivers().find((x) => x.currentDirection !== "stopped" && x.receiver.track.kind === track.kind && !x.sender.track);
+  if (!t) return pc.addTrack(track, stream);
+  t.sender.replaceTrack(track).catch((e) => console.error(e));
+  if (t.sender.setStreams) t.sender.setStreams(stream);
+  t.direction = "sendrecv";
+}
+
+async function getMedia(video) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error("unsupported"), { name: "Unsupported" });
+  try { return await navigator.mediaDevices.getUserMedia({ audio: true, video: video ? VIDEO : false }); }
+  catch (e) {
+    if (video && e.name !== "NotAllowedError" && e.name !== "SecurityError") return getMedia(false); // no usable camera: voice only
+    throw e;
+  }
+}
+function mediaError(e, what = "microphone") {
+  if (e.name === "Unsupported") return "This browser can't make calls.";
+  if (e.name === "NotAllowedError" || e.name === "SecurityError")
+    return `P2P Chat isn't allowed to use your ${what}. Allow it in your browser's site settings (usually behind the icon left of the address), then try again.`;
+  if (e.name === "NotFoundError" || e.name === "OverconstrainedError") return `No ${what} found. Connect one and try again.`;
+  if (e.name === "NotReadableError" || e.name === "AbortError") return `Your ${what} can't be opened. Another app may be using it.`;
+  return `Couldn't start your ${what}: ${e.message || e.name}`;
+}
+function useLocal(stream) {
+  call.local = stream;
+  call.cam = stream.getVideoTracks().length > 0;
+  $("localVideo").srcObject = call.cam ? new MediaStream(stream.getVideoTracks()) : null;
+}
+
+async function startCall(cid, video) {
+  if (call) return showCall();
+  const peer = peerFor(cid);
+  if (!peer) return;
+  if (!(peer.caps || []).includes("call"))
+    return notice("Calls aren't possible yet", `${contactName(cid)} uses an older version of P2P Chat. Ask them to reload the page, then connect again.`);
+  const c = call = { id: uid(), cid, peer, dir: "out", video, state: "ringing", rang: false, local: null, mic: true, cam: false, remoteMic: true, remoteCam: false };
+  showCall(); render();
+  let stream;
+  try { stream = await getMedia(video); }
+  catch (e) {
+    if (call === c) endCallLocally(null);
+    return notice("Can't start the call", mediaError(e));
+  }
+  if (call !== c) return stopStream(stream); // cancelled while the browser asked for permission
+  useLocal(stream);
+  if (c.dir === "in") { sendCall(c, "accept"); return beginActive(); } // they called us meanwhile
+  c.rang = true;
+  sendCall(c, "ring", { video });
+  c.ringTimer = setTimeout(() => hangUp("noanswer"), CALL_RING_MS);
+  startTone("out");
+  renderCall();
+}
+
+async function acceptCall(withVideo) {
+  const c = call;
+  if (!c || c.state !== "incoming") return;
+  clearTimeout(c.ringTimer); stopTone();
+  c.state = "connecting"; renderCall();
+  let stream;
+  try { stream = await getMedia(withVideo); }
+  catch (e) {
+    if (call === c) { sendCall(c, "decline"); endCallLocally(`Missed ${callKind(c).toLowerCase()} from ${contactName(c.cid)}.`); }
+    return notice("Can't answer the call", mediaError(e));
+  }
+  if (call !== c) return stopStream(stream); // they hung up meanwhile
+  useLocal(stream);
+  sendCall(c, "accept");
+  beginActive();
+}
+
+function beginActive() {
+  const c = call;
+  clearTimeout(c.ringTimer); stopTone();
+  c.state = "active"; c.startedAt = Date.now();
+  for (const t of c.local.getTracks()) attachTrack(c.peer.pc, t, c.local);
+  sendState();
+  c.tick = setInterval(renderCallTime, 1000);
+  refreshRemote(); renderCall(); render();
+  $("announcer").textContent = `Call with ${contactName(c.cid)} started.`;
+}
+
+function hangUp(reason) {
+  const c = call;
+  if (!c) return;
+  const who = contactName(c.cid);
+  if (c.dir === "in" && c.state !== "active") {
+    sendCall(c, "decline");
+    return endCallLocally(`You declined a ${callKind(c).toLowerCase()} from ${who}.`);
+  }
+  if (c.rang) sendCall(c, "end");
+  if (c.state === "active") endCallLocally(`${callKind(c)}, ${callDuration(c)}`);
+  else endCallLocally(reason === "noanswer" ? `${who} didn't answer.` : c.rang ? "You cancelled the call." : null);
+}
+
+function callLost() {
+  const c = call, who = contactName(c.cid);
+  if (c.state === "active") endCallLocally(`${callKind(c)}, ${callDuration(c)}. The connection was lost.`);
+  else if (c.dir === "in") endCallLocally(`Missed ${callKind(c).toLowerCase()} from ${who}.`, true);
+  else endCallLocally(c.rang ? `Couldn't reach ${who}: the connection was lost.` : null);
+}
+
+function callNote(cid, text, missed) {
+  const conv = ensureDm(cid);
+  addToConv(conv, { id: uid(), sys: true, text, ts: Date.now() });
+  if (missed && (conv.id !== current || document.hidden)) conv.unread = (conv.unread || 0) + 1;
+  save();
+}
+
+function endCallLocally(note, missed = false) {
+  const c = call;
+  if (!c) return;
+  call = null;
+  clearTimeout(c.ringTimer); clearInterval(c.tick); stopTone();
+  stopStream(c.local);
+  const pc = c.peer.pc;
+  if (pc.signalingState !== "closed") for (const s of pc.getSenders()) if (s.track) try { pc.removeTrack(s); } catch {}
+  $("remoteVideo").srcObject = null;
+  $("localVideo").srcObject = null;
+  if (callDlg.open) callDlg.close();
+  $("callBar").hidden = true;
+  if (note) callNote(c.cid, note, missed);
+  if (c.state === "active" || note) $("announcer").textContent = note || "Call ended.";
+  render();
+}
+
+function onCall(peer, p) {
+  const id = clip(p.call, 64);
+  if (!id) return;
+  const who = contactName(peer.cid);
+  if (p.a === "ring") {
+    const kind = p.video ? "video call" : "voice call";
+    if (call && call.cid === peer.cid && call.dir === "out" && call.state === "ringing") {
+      if (call.rang) {
+        // Both called each other at the same moment: the side with the smaller ID answers the other call.
+        if (me.id < peer.cid) {
+          clearTimeout(call.ringTimer);
+          Object.assign(call, { id, dir: "in", video: call.video || !!p.video, remoteCam: !!p.video });
+          sendCall(call, "accept");
+          beginActive();
+        }
+        return;
+      }
+      // We're still starting the microphone: answer their call as soon as it's ready.
+      Object.assign(call, { id, dir: "in", rang: true, video: call.video || !!p.video, remoteCam: !!p.video });
+      return;
+    }
+    if (call) {
+      sendPeer(peer, { t: "call", a: "busy", call: id });
+      callNote(peer.cid, `Missed ${kind} from ${who} while you were on another call.`, true);
+      return render();
+    }
+    call = { id, cid: peer.cid, peer, dir: "in", video: !!p.video, state: "incoming", rang: true, local: null, mic: true, cam: false, remoteMic: true, remoteCam: !!p.video };
+    // Safety net in case their "end" never arrives.
+    call.ringTimer = setTimeout(() => { if (call && call.id === id && call.state === "incoming") endCallLocally(`Missed ${kind} from ${who}.`, true); }, CALL_RING_MS + 15000);
+    startTone("in");
+    $("announcer").textContent = `${who} is calling you.`;
+    showCall();
+    return render();
+  }
+  const c = call;
+  if (!c || c.id !== id || c.peer !== peer) return;
+  if (p.a === "accept" && c.dir === "out" && c.state === "ringing" && c.rang) beginActive();
+  else if (p.a === "decline" && c.dir === "out" && c.state !== "active") endCallLocally(`${who} declined the call.`);
+  else if (p.a === "busy" && c.dir === "out" && c.state !== "active") endCallLocally(`${who} is on another call.`);
+  else if (p.a === "end") {
+    if (c.state === "active") endCallLocally(`${callKind(c)}, ${callDuration(c)}`);
+    else if (c.dir === "in") endCallLocally(`Missed ${callKind(c).toLowerCase()} from ${who}.`, true);
+  } else if (p.a === "state") {
+    c.remoteMic = p.mic !== false; c.remoteCam = p.cam === true; renderCall();
+  }
+}
+
+function toggleMic() {
+  if (!call || !call.local) return;
+  call.mic = !call.mic;
+  for (const t of call.local.getAudioTracks()) t.enabled = call.mic;
+  sendState(); renderCall();
+}
+
+async function toggleCamera() {
+  const c = call;
+  if (!c || !c.local || c.camBusy) return;
+  c.camBusy = true;
+  try {
+    const cur = c.local.getVideoTracks()[0];
+    if (cur) {
+      cur.stop(); c.local.removeTrack(cur);
+      const s = c.peer.pc.getSenders().find((x) => x.track === cur);
+      if (s) await s.replaceTrack(null); // keeps the slot for turning the camera back on
+      c.cam = false;
+    } else {
+      let track;
+      try { track = (await navigator.mediaDevices.getUserMedia({ video: VIDEO })).getVideoTracks()[0]; }
+      catch (e) { notice("Can't turn on the camera", mediaError(e, "camera")); return; }
+      if (call !== c) { track.stop(); return; }
+      c.local.addTrack(track);
+      if (c.state === "active") attachTrack(c.peer.pc, track, c.local);
+      c.cam = true;
+    }
+    $("localVideo").srcObject = c.cam ? new MediaStream(c.local.getVideoTracks()) : null;
+    sendState(); renderCall();
+  } finally { c.camBusy = false; }
+}
+
+function showCall() {
+  if (!call) return;
+  $("callBar").hidden = true;
+  if (!callDlg.open) callDlg.showModal();
+  renderCall();
+  (call.state === "incoming" ? $("callAccept") : $("callEnd")).focus();
+}
+function minimizeCall() {
+  if (!call || call.state !== "active") return;
+  callDlg.close();
+  $("callBar").hidden = false;
+  openConv(dmId(call.cid));
+  renderCallTime();
+}
+
+function callStatusText(c) {
+  if (c.state === "incoming") return c.video ? "Incoming video call…" : "Incoming voice call…";
+  if (c.state === "connecting") return "Connecting…";
+  if (c.state === "ringing") return c.local ? "Calling…" : "Starting your microphone…";
+  return callDuration(c) + (c.mic ? "" : " · You're muted") + (c.remoteMic ? "" : ` · ${contactName(c.cid)} is muted`);
+}
+function renderCallTime() {
+  if (!call) return;
+  $("callStatus").textContent = callStatusText(call);
+  $("callBarText").textContent = `Call with ${contactName(call.cid)} · ${callStatusText(call)}`;
+}
+function renderCall() {
+  const c = call;
+  if (!c) return;
+  const who = contactName(c.cid);
+  const st = c.state, incoming = st === "incoming";
+  const remoteVideo = remoteTracks(c.peer.pc).some((t) => t.kind === "video");
+  callDlg.classList.toggle("has-video", st === "active" && c.remoteCam && remoteVideo);
+  $("callName").textContent = who;
+  $("callAvatar").replaceChildren(avatar(c.cid, who, false, "large"));
+  $("localVideo").hidden = !c.cam;
+  $("callMic").hidden = $("callCam").hidden = incoming || (st === "connecting" && c.dir === "in");
+  $("callMic").disabled = $("callCam").disabled = !c.local;
+  $("callMic").textContent = c.mic ? "Mute" : "Unmute";
+  $("callMic").classList.toggle("off", !c.mic);
+  $("callCam").textContent = c.cam ? "Turn camera off" : "Turn camera on";
+  $("callMin").hidden = st !== "active";
+  $("callDecline").hidden = $("callAccept").hidden = !incoming;
+  $("callVoice").hidden = !incoming || !c.video;
+  $("callEnd").hidden = incoming;
+  $("callEnd").textContent = st === "active" ? "Hang up" : "Cancel";
+  renderCallTime();
+}
+
+// Ring tones, generated (no audio files): a double beep for incoming calls, a long
+// tone for "Calling…". Browsers may block sound until the page was clicked once.
+let toneStop = null;
+function startTone(kind) {
+  stopTone();
+  let ctx;
+  try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
+  ctx.resume().catch(() => {});
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  gain.connect(ctx.destination);
+  for (const f of kind === "in" ? [660, 880] : [440, 480]) {
+    const o = ctx.createOscillator();
+    o.frequency.value = f; o.connect(gain); o.start();
+  }
+  const parts = kind === "in" ? [[0, 0.35], [0.5, 0.85]] : [[0, 1.2]];
+  const beep = () => {
+    const t = ctx.currentTime + 0.02;
+    for (const [a, b] of parts) { gain.gain.setTargetAtTime(0.06, t + a, 0.01); gain.gain.setTargetAtTime(0, t + b, 0.01); }
+    if (kind === "in" && navigator.vibrate) navigator.vibrate([350, 150, 350]);
+  };
+  beep();
+  const iv = setInterval(beep, kind === "in" ? 2500 : 4000);
+  toneStop = () => { clearInterval(iv); ctx.close().catch(() => {}); };
+}
+function stopTone() { if (toneStop) { toneStop(); toneStop = null; } }
 
 // ---------- dialogs ----------
 function ask(title, text, buttons) {
@@ -1300,6 +1733,9 @@ function renderChat() {
     const ct = S.contacts[c.peer] || {};
     $("chatSub").textContent = (on ? "Connected" : "Not connected. Your messages are sent when you reconnect.") + (ct.verified ? " · Verified ✓" : "");
     if (!on) actions.push(el("button", { type: "button", textContent: "Reconnect", onclick: openConnect }));
+    if (on && !call) actions.push(
+      el("button", { type: "button", textContent: "Call", onclick: () => startCall(c.peer, false) }),
+      el("button", { type: "button", textContent: "Video call", onclick: () => startCall(c.peer, true) }));
     if (ct.pub) actions.push(el("button", { type: "button", textContent: ct.verified ? "Verified ✓" : "Verify", onclick: () => openVerify(c.peer) }));
     $("text").placeholder = on ? "Type a message…" : `Message (sent when ${convName(c)} is connected)`;
   } else {
@@ -1342,7 +1778,8 @@ function render() {
   renderList();
   renderChat();
   const unread = Object.values(S.convs).reduce((n, c) => n + (c.unread || 0), 0);
-  document.title = unread ? `(${unread}) P2P Chat` : "P2P Chat";
+  document.title = call && call.state === "incoming" ? `${contactName(call.cid)} is calling… · P2P Chat`
+    : unread ? `(${unread}) P2P Chat` : "P2P Chat";
 }
 
 function openConv(id) {
@@ -1377,7 +1814,21 @@ document.addEventListener("visibilitychange", () => {
   if (!me || document.hidden || !current || !S.convs[current]) return;
   S.convs[current].unread = 0; save(); render();
 });
-window.addEventListener("beforeunload", () => { for (const p of peers.values()) try { p.pc.close(); } catch {} });
+window.addEventListener("beforeunload", () => {
+  if (call) hangUp(); // tell the other side, instead of letting the connection time out
+  for (const p of peers.values()) try { p.pc.close(); } catch {}
+});
+$("callAccept").onclick = () => acceptCall(!!(call && call.video));
+$("callVoice").onclick = () => acceptCall(false);
+$("callDecline").onclick = () => hangUp();
+$("callEnd").onclick = () => hangUp();
+$("btnCallBarEnd").onclick = () => hangUp();
+$("callMic").onclick = toggleMic;
+$("callCam").onclick = toggleCamera;
+$("callMin").onclick = minimizeCall;
+$("btnCallReturn").onclick = showCall;
+// Escape doesn't end a call: it goes back to the chat (or does nothing while ringing).
+callDlg.addEventListener("cancel", (e) => { e.preventDefault(); minimizeCall(); });
 
 // ---------- version & auto-update ----------
 // version.json is fetched bypassing every cache. If it names a different

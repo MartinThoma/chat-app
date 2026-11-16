@@ -33,3 +33,10 @@ WebRTC needs an offer and an answer to travel between two browsers before they c
 - Show the invite and reply codes as QR codes, and scan them with the camera: Alice shows, Bob scans, Bob shows, Alice scans.
 - Generate the QR code and scan it inside the page, keeping the app a single file.
 - Works best with **shorter codes**. Today's codes are about 600–900 characters. Packing only the needed parts (fingerprint, password, addresses) as raw bytes would bring them down to roughly 100–180 characters. That's worth doing first, because it also makes pasting into messengers easier.
+
+## D. Group calls
+
+**Goal:** call a whole group.
+
+- Every participant connects to every other participant, as in 1:1 calls. That works for small groups (about 4–6 people), because each browser sends its video to everyone.
+- Needs direct connections between all participants, so it depends on A: members who haven't swapped codes would connect through the group automatically.

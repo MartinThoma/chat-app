@@ -14,6 +14,7 @@ Use it at **https://martin-thoma.com/chat-app/**, or run it yourself:
 - No sign-up: your account is a key pair created in your browser on first use. A short onboarding screen explains the app and offers a password-protected backup.
 - Everything you send is signed, so nobody can pretend to be you or change your messages. A security number lets two people verify each other.
 - Back up your account to a file and restore it on another device.
+- Voice and video calls in personal chats, over the same direct connection.
 - Personal chats and group chats. Group members don't all need to be connected to each other: members pass messages on.
 - Messages written while someone isn't connected are sent when they reconnect, with a "Not delivered yet" marker until then.
 - Delete a message for yourself, or your own message for everyone. Delete a chat, or leave a group.

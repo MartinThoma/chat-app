@@ -29,9 +29,12 @@ All colors are CSS variables on `:root`. Dark mode follows the operating system 
 | `--ok` | `#1f9d55` | `#3cbf74` | "Connected" dot |
 | `--bad` | `#c93636` | `#f07a7a` | Error text |
 | `--danger` | `#c93636` | `#c93636` | Destructive buttons (white text) |
+| `--call` | `#137a42` | `#137a42` | Call bar, **Accept** button (white text) |
 | `--shadow` | soft, 8% | soft, 35% | Onboarding card |
 
 Text meets WCAG AA contrast (4.5:1) against its background in both themes.
+
+The **call screen** is always dark (`#0e1116`, white text, secondary text `#c3c9d5`), in both themes, so video stands out and the screen doesn't glare in a dark room.
 
 **Avatars** get a hue computed from the user or group ID: `hsl(hue 45% 42%)` with white initials. The same person always has the same color, and the color works in both themes.
 
@@ -42,8 +45,8 @@ Text meets WCAG AA contrast (4.5:1) against its background in both themes.
 
 | Size | Used for |
 |---|---|
-| 48px / 600 | Onboarding headline (desktop only; 24px on phones), line height 1.08 |
-| 24px / 600 | App title, welcome heading, onboarding step titles, security number |
+| 48px / 600 | Onboarding headline (desktop only; 24px on phones), line height 1.08. Initial in the large call avatar |
+| 24px / 600 | App title, welcome heading, onboarding step titles, security number, caller's name |
 | 16px / 400 and 600 | Body, messages, buttons, inputs, chat names, chat and dialog titles |
 | 12px | Hints, timestamps, previews, message details, system lines, badges, connection codes |
 
@@ -107,6 +110,7 @@ Text meets WCAG AA contrast (4.5:1) against its background in both themes.
 | Chat list rows, connection steps | 10px |
 | Group avatars | 12px (rounded square, so groups and people look different) |
 | Message bubbles, dialogs, onboarding card | 14px |
+| Call buttons | pill (fully rounded) |
 | People's avatars, online dot, badges | round |
 
 Spacing steps are 4, 6, 8, 10, 12 and 16px. Gaps between related controls are 8px.
@@ -131,6 +135,17 @@ Disabled buttons are shown at 50% opacity.
 **Connection steps.** Numbered cards ("1. Send this invite code to your friend") with a monospace code box and a **Copy code** button that briefly changes to "Copied ✓".
 
 **Update banner.** A full-width accent strip under the top bar: "Version x is available…" with **Reload now**.
+
+**Call screen.** A full-window dialog on the dark call background.
+- Without video: the person's avatar (112px) centered, with their name (24px) and the status below: "Calling…", "Incoming video call…", or the running time ("3:12 · Bob is muted").
+- With video: the other person's video fills the screen, letterboxed (`object-fit: contain`) so nothing is cropped. Avatar, name and time shrink into a dark translucent chip at the top left.
+- Your own camera shows as a mirrored 176px preview at the bottom right (104px on phones). It's hidden while your camera is off.
+- Buttons are text pills in one centered row at the bottom, wrapping on phones: translucent white for **Mute**, **Turn camera on/off** and **Show chat**; red for **Hang up** and **Decline**; green (`--call`) for **Accept**. **Mute** turns solid white while you're muted, so the state is visible at a glance.
+- Escape goes back to the chat instead of hanging up.
+
+**Call bar.** A full-width green strip (`--call`) under the top bar while a call runs in the background: "Call with Bob · 3:12" with **Return to call** and **Hang up**.
+
+**Call notes.** Calls appear in the chat as system lines ("Video call, 3:12", "Missed voice call from Alice.").
 
 **Full-page notices.** Centered 24px title with muted text, covering the whole page:
 - "P2P Chat is open in another tab", with **Use here**.
