@@ -151,7 +151,7 @@ Disabled buttons are shown at 50% opacity.
 **Update banner.** A full-width accent strip under the top bar: "Version x is available…" with **Reload now**.
 
 **Call screen.** A full-window dialog on the dark call background.
-- Without video: the person's avatar (112px) centered, with their name (24px) and the status below: "Calling…", "Incoming video call…", or the running time ("3:12 · Bob is muted").
+- Without video: the person's avatar (112px) centered, with their name (24px) and the status below: "Calling…", "Incoming video call…", or the running time ("3:12 · Bob is muted", "3:12 · Reconnecting…" while the connection is interrupted).
 - With video: the other person's video fills the screen, letterboxed (`object-fit: contain`) so nothing is cropped. Avatar, name and time shrink into a dark translucent chip at the top left.
 - Your own camera shows as a mirrored 176px preview at the bottom right (104px on phones). It's hidden while your camera is off.
 - Buttons are 56px round icon buttons (52px on phones, 24px icons) in one centered row at the bottom, wrapping on phones: translucent white for **Mute** (microphone), **Turn camera on/off** (camera) and **Show chat** (speech bubble); red with a crossed-out phone for **Hang up**, **Cancel** and **Decline**; translucent white with a phone for **Answer without video**; green (`--call`) for **Accept**, with a camera for video calls and a phone for voice calls. The microphone and camera icons show the current state: crossed out while off. **Mute** also turns solid white while you're muted, so the state is visible at a glance. Disabled buttons stay in place at 50% opacity.
@@ -159,7 +159,7 @@ Disabled buttons are shown at 50% opacity.
 
 **Set up calls dialog.** A regular dialog: a muted line about what's used and when (or, when blocked, where to allow it), then **Allow microphone and camera** as the primary button. Once allowed, it shows a microphone picker with a native `<meter>` level bar under it, a camera picker, and a mirrored 4:3 camera preview with an 8px radius.
 
-**Call bar.** A full-width green strip (`--call`) under the top bar while a call runs in the background: "Call with Bob · 3:12" with **Return to call** and **Hang up**.
+**Call bar.** A full-width green strip (`--call`) under the top bar while a call runs in the background: "Call with Bob · 3:12" followed by two 36px round icon buttons: **Return to call** (outward arrows, translucent white) and **Hang up** (crossed-out phone, red). Tapping the text also returns to the call.
 
 **Call notes.** Calls appear in the chat as system lines ("Video call, 3:12", "Missed voice call from Alice.").
 

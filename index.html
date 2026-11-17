@@ -197,7 +197,15 @@
     display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
     padding: 8px 16px; background: var(--call); color: var(--call-text);
   }
-  #callBar button { padding: 3px 12px; }
+  #callBarText { cursor: pointer; }
+  #callBar button {
+    display: grid; place-items: center; width: 36px; height: 36px; padding: 0;
+    border: 0; border-radius: 50%; background: rgb(255 255 255 / .18); color: #fff;
+  }
+  #callBar button svg { width: 18px; height: 18px; }
+  #callBar button:hover { background: rgb(255 255 255 / .28); }
+  #callBar button.danger { background: var(--danger); color: var(--danger-text); }
+  #callBar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   dialog.call {
     width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0;
     border: 0; border-radius: 0; overflow: hidden; background: #0e1116; color: #fff;
@@ -314,8 +322,9 @@
 </div>
 <div id="callBar" role="status" hidden>
   <span id="callBarText"></span>
-  <button type="button" id="btnCallReturn">Return to call</button>
-  <button type="button" id="btnCallBarEnd">Hang up</button>
+  <!-- Icon-only: the icons, aria-labels and titles are set at startup. -->
+  <button type="button" id="btnCallReturn"></button>
+  <button type="button" id="btnCallBarEnd" class="danger"></button>
 </div>
 
 <main>
@@ -520,7 +529,7 @@
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.10.0";
+const APP_VERSION = "1.11.0";
 const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
@@ -963,7 +972,10 @@ function newPeer() {
   const peer = { key, pc, dc: null, cid: null, status: "pending", queue: Promise.resolve() };
   peers.set(key, peer);
   pc.addEventListener("connectionstatechange", () => {
-    if (["failed", "closed", "disconnected"].includes(pc.connectionState)) removePeer(peer);
+    const st = pc.connectionState;
+    if (st === "disconnected" && call && call.peer === peer && call.state === "active") callInterrupted(peer);
+    else if (["failed", "closed", "disconnected"].includes(st)) removePeer(peer);
+    else if (st === "connected" && peer.graceTimer) callResumed(peer);
   });
   return peer;
 }
@@ -981,6 +993,7 @@ function attachChannel(peer, dc) {
 function removePeer(peer) {
   if (!peers.has(peer.key)) return;
   peers.delete(peer.key);
+  clearTimeout(peer.graceTimer);
   try { peer.dc && peer.dc.close(); } catch {}
   try { peer.pc.close(); } catch {}
   if (pendingPeer === peer) pendingPeer = null;
@@ -1858,7 +1871,8 @@ btnInstall.onclick = async () => {
 const CALL_RING_MS = 45000;
 const VIDEO = { width: { ideal: 1280 }, height: { ideal: 720 } };
 // { id, cid, peer, dir: "out"|"in", video, state: "ringing"|"incoming"|"connecting"|"active",
-//   rang (the other side knows about the call), local: MediaStream, mic, cam, remoteMic, remoteCam, startedAt, ringTimer, tick }
+//   rang (the other side knows about the call), local: MediaStream, mic, cam, remoteMic, remoteCam, startedAt, ringTimer, tick,
+//   reconnecting (the connection dropped; waiting up to CALL_GRACE_MS for it to come back) }
 let call = null;
 const callDlg = $("callDlg");
 
@@ -2132,6 +2146,29 @@ function hangUp(reason) {
   else endCallLocally(reason === "noanswer" ? `${who} didn't answer.` : c.rang ? "You cancelled the call." : null);
 }
 
+// "disconnected" often recovers by itself (a Wi-Fi hiccup, a tunnel), so during a call
+// the connection gets a grace period before it's given up. The browser keeps checking
+// the old path; a new IP address can't be found this way and still ends the call.
+const CALL_GRACE_MS = 20000;
+function callInterrupted(peer) {
+  clearTimeout(peer.graceTimer);
+  peer.graceTimer = setTimeout(() => {
+    peer.graceTimer = null;
+    if (peer.pc.connectionState !== "connected") removePeer(peer);
+  }, CALL_GRACE_MS);
+  call.reconnecting = true;
+  $("announcer").textContent = "Connection lost. Reconnecting…";
+  renderCall();
+}
+function callResumed(peer) {
+  clearTimeout(peer.graceTimer);
+  peer.graceTimer = null;
+  if (!call || call.peer !== peer || !call.reconnecting) return;
+  call.reconnecting = false;
+  $("announcer").textContent = "Reconnected.";
+  renderCall();
+}
+
 function callLost() {
   const c = call, who = contactName(c.cid);
   if (c.state === "active") endCallLocally(`${callKind(c)}, ${callDuration(c)}. The connection was lost.`);
@@ -2267,6 +2304,7 @@ function callStatusText(c) {
     (c.micBlocked ? " Your browser blocks the microphone: allow it in the site settings to answer." : "");
   if (c.state === "connecting") return "Connecting…";
   if (c.state === "ringing") return c.local ? "Calling…" : "Starting your microphone…";
+  if (c.reconnecting) return callDuration(c) + " · Reconnecting…";
   return callDuration(c) + (c.mic ? "" : " · You're muted") + (c.remoteMic ? "" : ` · ${contactName(c.cid)} is muted`);
 }
 function renderCallTime() {
@@ -2762,6 +2800,7 @@ const ICONS = {
   phoneOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="23" y1="1" x2="1" y2="23"/></svg>',
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
   micOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+  expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>',
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>',
 };
@@ -2862,6 +2901,9 @@ $("callMic").onclick = toggleMic;
 $("callCam").onclick = toggleCamera;
 $("callMin").onclick = minimizeCall;
 $("btnCallReturn").onclick = showCall;
+$("callBarText").onclick = showCall; // tapping the bar returns too, as in phone apps
+setCallBtn("btnCallReturn", "expand", "Return to call");
+setCallBtn("btnCallBarEnd", "phoneOff", "Hang up");
 $("btnCallSetup").onclick = openCallSetup;
 notifyEl.addEventListener("change", () => setNotify(notifyEl.checked));
 window.addEventListener("focus", () => { if (me && active) render(); }); // marks the open chat as read

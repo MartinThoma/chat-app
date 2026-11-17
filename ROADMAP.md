@@ -52,3 +52,15 @@ Shipped in 1.5 with Nostr relays: invite links and automatic reconnection betwee
 - **To check first:** whether a web page can send to push services directly. They probably don't allow it from web pages (CORS), which would mean running a small relay, for example a Cloudflare Worker. That's a server, so this would be opt-in, like meeting points.
 - **Privacy:** the push service sees when someone sends you a push, not the content.
 - On iPhones it only works when P2P Chat is added to the home screen (iOS 16.4 and later).
+
+## F. Resume calls after a network change
+
+**Goal:** a call survives a new IP address, for example switching from Wi-Fi to mobile data, without ringing again.
+
+Since 1.11, a call waits up to 20 seconds when the connection drops, which covers short hiccups on the same network. A new IP address can't be recovered that way: the browser only keeps retrying the old path, and the offers and ICE candidates needed for a new path would travel over the very data channel that just broke.
+
+- **Restart ICE through the meeting point.** While a call is reconnecting, send the ICE restart offer and answer through the relays (encrypted and signed, like reconnection offers), so the existing connection, with its data channel and call, moves to the new addresses.
+- **Or rejoin on reconnect.** If a new connection forms during the grace period (automatic reconnection through meeting points), continue the same call on it: both sides recognize the call ID, attach their microphone and camera to the new connection without ringing, and the call keeps its running time. The grace period would need to be longer, about 30–60 seconds, to cover the reconnection.
+- Needs meeting points on both sides (B), or a mutual contact who is online (A).
+
+**Limit:** without meeting points or a mutual contact online, a call still can't survive an IP change.
