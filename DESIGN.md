@@ -8,7 +8,7 @@ P2P Chat should feel like a familiar messenger: calm, quick to understand, nothi
 - **Quiet chrome, loud content.** Grays and white surfaces. Color is reserved for the accent (actions, my messages), status (connected, errors) and avatars.
 - **Say what will happen.** Buttons name their result ("Accept invite", "Leave and delete"). Hints explain the consequence ("They keep their copy").
 - **No motion.** Nothing animates. State changes appear instantly, which suits a tool that's often used for quick check-ins. The only moving things are live readings: video, and the microphone level bar in **Set up calls**.
-- **One file.** Only system fonts, no icon fonts, no image files. The few icons (phone, camera, ⋮) are inline SVGs from Feather (MIT license), drawn with `currentColor` so they follow the theme. Avatars are initials on colored backgrounds. The extra files are `sw.js`, a tiny service worker that exists because Chrome on Android shows notifications only through one, and what installing as an app needs: `manifest.webmanifest` and the app icon in `icons/`.
+- **One file.** Only system fonts, no icon fonts, no image files. The few icons (phone, camera, microphone, chat, ⋮) are inline SVGs from Feather (MIT license), drawn with `currentColor` so they follow the theme. Avatars are initials on colored backgrounds. The extra files are `sw.js`, a tiny service worker that exists because Chrome on Android shows notifications only through one, and what installing as an app needs: `manifest.webmanifest` and the app icon in `icons/`.
 
 ## Color
 
@@ -114,7 +114,7 @@ The installed app's title bar follows `--panel` (white, or `#1b1f27` in dark mod
 | Chat list rows, connection steps | 10px |
 | Group avatars | 12px (rounded square, so groups and people look different) |
 | Message bubbles, dialogs, onboarding card | 14px |
-| Call buttons | pill (fully rounded) |
+| Call buttons | circle |
 | People's avatars, online dot, badges | round |
 
 Spacing steps are 4, 6, 8, 10, 12 and 16px. Gaps between related controls are 8px.
@@ -154,7 +154,7 @@ Disabled buttons are shown at 50% opacity.
 - Without video: the person's avatar (112px) centered, with their name (24px) and the status below: "Calling…", "Incoming video call…", or the running time ("3:12 · Bob is muted").
 - With video: the other person's video fills the screen, letterboxed (`object-fit: contain`) so nothing is cropped. Avatar, name and time shrink into a dark translucent chip at the top left.
 - Your own camera shows as a mirrored 176px preview at the bottom right (104px on phones). It's hidden while your camera is off.
-- Buttons are text pills in one centered row at the bottom, wrapping on phones: translucent white for **Mute**, **Turn camera on/off** and **Show chat**; red for **Hang up** and **Decline**; green (`--call`) for **Accept**. **Mute** turns solid white while you're muted, so the state is visible at a glance.
+- Buttons are 56px round icon buttons (52px on phones, 24px icons) in one centered row at the bottom, wrapping on phones: translucent white for **Mute** (microphone), **Turn camera on/off** (camera) and **Show chat** (speech bubble); red with a crossed-out phone for **Hang up**, **Cancel** and **Decline**; translucent white with a phone for **Answer without video**; green (`--call`) for **Accept**, with a camera for video calls and a phone for voice calls. The microphone and camera icons show the current state: crossed out while off. **Mute** also turns solid white while you're muted, so the state is visible at a glance. Disabled buttons stay in place at 50% opacity.
 - Escape goes back to the chat instead of hanging up.
 
 **Set up calls dialog.** A regular dialog: a muted line about what's used and when (or, when blocked, where to allow it), then **Allow microphone and camera** as the primary button. Once allowed, it shows a microphone picker with a native `<meter>` level bar under it, a camera picker, and a mirrored 4:3 camera preview with an 8px radius.
@@ -183,5 +183,5 @@ Disabled buttons are shown at 50% opacity.
 - Every control can be reached with the keyboard. Dialogs trap focus, because `showModal()` does that.
 - Confirmation dialogs put focus on the safe choice.
 - New incoming messages are announced through a hidden `aria-live="polite"` area ("Bob in Trip: see you!"). The message list itself is not a live region, because it's redrawn on every change and would otherwise be read out again in full.
-- Buttons that only show an icon (✕, ←, phone, camera, ⋮) have an `aria-label`, and a `title` tooltip with the same text, or with the reason when disabled.
+- Buttons that only show an icon (✕, ←, phone, camera, ⋮, the call screen's buttons) have an `aria-label`, and a `title` tooltip with the same text, or with the reason when disabled.
 - Contrast is WCAG AA in light and dark mode.
