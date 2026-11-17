@@ -4,7 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>P2P Chat</title>
-<link rel="icon" href="data:,">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1f27" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <style>
   :root {
     --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #596173;
@@ -341,6 +345,14 @@
         <p class="hint" id="notifyInfo"></p>
       </div>
     </details>
+    <details class="side-section" id="installSection" hidden>
+      <summary>Install app</summary>
+      <div class="inner">
+        <p class="hint" id="installInfo"></p>
+        <div class="row"><button type="button" id="btnInstall" hidden>Install P2P Chat</button></div>
+        <p class="hint" id="installStatus" role="status"></p>
+      </div>
+    </details>
     <details class="side-section" id="settings">
       <summary>Network settings</summary>
       <div class="inner">
@@ -502,7 +514,7 @@
 "use strict";
 
 // Must match version.json (use `make bump VERSION=x.y.z` to change both).
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.9.0";
 const PROTO = 2; // wire protocol; peers with a different one are refused with a clear message
 
 // ---------- helpers ----------
@@ -1784,6 +1796,55 @@ function notifyMessage(c, from, text) {
   });
 }
 
+// ---------- install ----------
+// P2P Chat can be installed as an app (manifest.webmanifest): its own window and an icon on
+// the home screen or desktop. Chrome and Edge let the page offer that with a button; other
+// browsers only have it in their own menu, so the section then says where to look.
+const installEl = $("installSection"), btnInstall = $("btnInstall");
+const standaloneMQ = matchMedia("(display-mode: standalone)");
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isMacSafari = !isIOS && /Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent);
+const OWN_STORAGE = "The installed app keeps its own chats, separate from the browser: move your account there with Back up account and Restore from backup.";
+const canWebInstall = typeof navigator.install === "function";
+let installPrompt = null, justInstalled = false;
+
+function renderInstall(status) {
+  // Already running as the app, or opened from disk (a file can't be installed).
+  installEl.hidden = standaloneMQ.matches || navigator.standalone === true || !/^https?:$/.test(location.protocol);
+  const offer = !justInstalled && (canWebInstall || !!installPrompt);
+  btnInstall.hidden = !offer;
+  $("installInfo").textContent = justInstalled ? "P2P Chat is installed. Open it from your home screen or app list."
+    : offer ? "Open P2P Chat in its own window, with an icon on your home screen or desktop. Your chats stay the same."
+    : isIOS ? "Tap Share, then Add to Home Screen. " + OWN_STORAGE
+    : isMacSafari ? "In Safari, choose File, then Add to Dock. " + OWN_STORAGE
+    : "Open P2P Chat in its own window, with an icon on your home screen or desktop. If your browser can do this, it's in the browser menu as Install app or Add to Home screen.";
+  if (status !== undefined) $("installStatus").textContent = status;
+}
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installPrompt = e; justInstalled = false; renderInstall(); });
+window.addEventListener("appinstalled", () => { installPrompt = null; justInstalled = true; renderInstall(""); });
+standaloneMQ.addEventListener("change", () => renderInstall());
+btnInstall.onclick = async () => {
+  if (btnInstall.getAttribute("aria-disabled") === "true") return;
+  btnInstall.setAttribute("aria-disabled", "true"); // not `disabled`, so focus stays on the button
+  let status = "";
+  try {
+    if (canWebInstall) {
+      await navigator.install(); // called right away, so the click still counts as the user's choice
+      justInstalled = true;
+    } else if (installPrompt) {
+      const p = installPrompt; installPrompt = null; // single use
+      await p.prompt();
+      if ((await p.userChoice).outcome !== "accepted") status = "Not installed.";
+    }
+  } catch (e) {
+    status = e.name === "AbortError" ? "Not installed." : "Your browser couldn't install P2P Chat.";
+    if (e.name !== "AbortError") console.error(e);
+  } finally {
+    btnInstall.removeAttribute("aria-disabled");
+    renderInstall(status);
+  }
+};
+
 // ---------- calls ----------
 // Voice and video calls with someone you're connected to. A call reuses the existing
 // connection: microphone and camera are added to it, and the change is negotiated over
@@ -2846,6 +2907,7 @@ function startApp() {
   renderAccount();
   renderCallAccess();
   renderNotify();
+  renderInstall();
   if (notifyEl.checked) ensureWorker();
   render();
   relaysUpdate(); resubscribe();

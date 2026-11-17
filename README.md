@@ -23,6 +23,7 @@ Use it at **https://martin-thoma.com/chat-app/**, or run it yourself:
 - Notifications for messages and calls while the app is open in the background.
 - Name, contacts and history survive closing the browser.
 - Light and dark mode, works on phones.
+- Install it as an app, with its own window and a home-screen icon.
 - Updates itself when a new version is published.
 
 See [PRODUCT.md](PRODUCT.md) for the full feature description and its limits, [DESIGN.md](DESIGN.md) for the look and feel, and [ROADMAP.md](ROADMAP.md) for what's planned.
@@ -47,7 +48,7 @@ The version shown next to the title is `APP_VERSION` in `index.html`. It must ma
 make bump VERSION=1.2.0
 ```
 
-Then commit and push to `main`. GitHub Pages serves the repository root (Settings → Pages → Deploy from branch `main`, folder `/`).
+Then commit and push to `main`. If you change `icons/icon.svg` or `icons/icon-maskable.svg`, run `make icons` to render the PNGs again (needs `rsvg-convert`). GitHub Pages serves the repository root (Settings → Pages → Deploy from branch `main`, folder `/`).
 
 Open copies of the app check `version.json` on load, every 5 minutes and whenever the tab becomes visible again. They always bypass the cache for this check.
 

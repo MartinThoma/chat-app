@@ -1,13 +1,13 @@
 # P2P Chat: product description
 
-P2P Chat is a messenger that runs entirely in the browser and needs no server. People connect by swapping a short code once, then chat directly from browser to browser. The whole app is one HTML file. It runs from https://martin-thoma.com/chat-app/, from a local web server, or by opening the file from disk.
+P2P Chat is a messenger that runs entirely in the browser and needs no server. People connect by swapping a short code once, then chat directly from browser to browser. The whole app is one HTML file, plus a few small files for notifications and installing. It runs from https://martin-thoma.com/chat-app/, from a local web server, or by opening the file from disk.
 
 ## Principles
 
 - **No server in the chat path.** Messages go from browser to browser over WebRTC data channels, encrypted with DTLS. Nothing is uploaded or stored centrally.
 - **Data stays on the device.** Name, contacts and chat history live in the browser's local storage, and nowhere else.
 - **An account is a key pair.** No email, phone number or password. Your identity is a cryptographic key created in your browser, and everything you send is signed with it.
-- **One file, no build step.** No libraries, no framework, no install. Anyone can read, host or fork it.
+- **One file, no build step.** No libraries, no framework, nothing to set up. Anyone can read, host or fork it. Next to `index.html` there are only a service worker for notifications (`sw.js`) and what installing needs (`manifest.webmanifest` and `icons/`).
 - **Honest about limits.** Without a server some things can't work, such as reaching someone whose browser is closed. The app says so instead of pretending.
 
 ## Features
@@ -122,6 +122,14 @@ With **Use public meeting points** turned on (Network settings, or **Use a singl
 - Tapping a notification brings P2P Chat to the front and opens the chat or the call.
 - While the window isn't in front, messages also don't count as read, so no read receipt is sent until you come back.
 - If the browser blocks notifications, the section says where to allow them (site settings, and on Android the Chrome app's notification setting).
+
+### Installing as an app
+
+- P2P Chat can be installed like an app: it then opens in its own window, without the browser's address bar, and has an icon on the home screen, in the app list or on the desktop. It's the same app at the same address, and it updates itself the same way.
+- The sidebar section **Install app** explains it. In Chrome and Edge it has an **Install P2P Chat** button that opens the browser's own install confirmation. Other browsers only offer installing in their menu ("Install app", "Add to Home screen"), so the section says where to look. On iPhone and iPad it says: tap Share, then **Add to Home Screen**. In Safari on a Mac: File, then **Add to Dock**.
+- In Chrome, Edge and on Android, the installed app shares its chats and account with the browser. On iPhone and iPad, and with Safari on a Mac, the installed app keeps its own storage, so it starts empty: move the account there with **Back up account** and **Restore from backup**. The section says so.
+- The section is hidden while P2P Chat runs as an installed app, and when it's opened from disk (a file can't be installed).
+- Installing changes nothing about connections: the app still has to be open to receive messages.
 
 ### Message delivery
 

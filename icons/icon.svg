@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- P2P Chat app icon: two speech bubbles on the accent blue. Source for the PNGs (make icons). -->
+  <rect width="512" height="512" rx="112" fill="#2f6fed"/>
+  <g fill="#fff" transform="translate(0 -14)">
+    <g opacity=".55">
+      <rect x="196" y="132" width="208" height="150" rx="44"/>
+      <path d="M340 262 L388 336 L298 280 Z"/>
+    </g>
+    <rect x="108" y="210" width="224" height="160" rx="46"/>
+    <path d="M140 350 L120 410 L214 362 Z"/>
+  </g>
+</svg>
